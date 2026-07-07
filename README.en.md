@@ -1,16 +1,38 @@
-# Research Agent · Energy & Power Engineering
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="Research Agent — Energy & Power Engineering" width="420">
+</p>
 
-[简体中文](README.md) | **English** | [日本語](README.ja.md) | [Español](README.es.md) | [Deutsch](README.de.md)
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python"></a>
+  <a href="https://github.com/1844514356zjc-dev/research-agent/actions/workflows/ci.yml"><img src="https://github.com/1844514356zjc-dev/research-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/powered_by-Claude-D97757.svg" alt="powered by Claude">
+</p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
-[![CI](https://github.com/1844514356zjc-dev/research-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/1844514356zjc-dev/research-agent/actions/workflows/ci.yml)
+<p align="center">
+  <a href="README.md">简体中文</a> · <b>English</b> · <a href="README.ja.md">日本語</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a>
+</p>
 
-> **A CLI research assistant for energy & power engineering — literature deep-read, academic polishing, manuscript review.**
+A CLI research assistant for **energy & power engineering** researchers. Handle three everyday tasks in one terminal: **literature search & deep-read, paper writing & polishing, review & idea evaluation**. The system prompts embed domain knowledge — Rankine/Brayton/combined cycles, ORC, sCO₂, HRSG, exergy analysis — and the writing styles of target journals (Energy, Applied Energy, Applied Thermal Engineering, ECAM, ASME JEGTP). Search runs on **free academic APIs** (no extra keys); your notes, drafts, and reviews stay in a local `workspace/`.
 
-A command-line research assistant for **energy & power engineering** researchers. Handle three everyday tasks in one terminal: **literature search & deep-read, paper writing & polishing, review & idea evaluation**. The system prompts embed domain knowledge — Rankine/Brayton/combined cycles, ORC, sCO₂, HRSG, exergy analysis — and the writing styles of target journals (Energy, Applied Energy, Applied Thermal Engineering, ECAM, ASME JEGTP).
+<p align="center"><sub><b>Install in 30 seconds</b></sub></p>
 
-Powered by the Claude API. Literature search runs entirely on **free academic APIs** (OpenAlex / Crossref / Semantic Scholar / arXiv / Unpaywall) — no extra API keys needed. Your notes, drafts, and reviews stay in a local `workspace/` folder; nothing is uploaded.
+```bash
+pipx install git+https://github.com/1844514356zjc-dev/research-agent.git
+research-agent   # first run launches a setup wizard: key / output language / model
+```
+
+## Contents
+
+|  |  |
+|---|---|
+| 🤔 [Why use it](#why-use-it) | ⚡ [Quick start](#quick-start-30-seconds) |
+| 👤 [Who it's for](#who-its-for) | 📦 [Installation](#installation) |
+| ✨ [Features](#features) | 📖 [Usage](#usage) |
+| 🛠️ [Tools & data sources](#tools--data-sources) | 🧩 [Architecture](#architecture) |
+| ⚙️ [Configuration](#configuration) | 🧪 [Typical workflows](#typical-workflows) |
+| ❓ [FAQ](#faq) | ⚠️ [Limitations](#limitations) |
+| 🤝 [Contributing](#contributing) | 📄 [License](#license) |
 
 > 🌐 **Language note:** The agent **defaults to Chinese output** (with English technical terms) — or whatever your system language detects to. Switch any of these ways: set `OUTPUT_LANG` (`zh`/`en`/`ja`/`es`/`de`), pick it in the first-run wizard, or run `/lang en` mid-session.
 >
@@ -240,9 +262,28 @@ research-agent review --model opus
 
 ---
 
+## Architecture
+
+```mermaid
+flowchart LR
+  U([You / researcher]) --> REPL[/REPL · slash commands/]
+  REPL --> Mode{Mode}
+  Mode -->|literature| M1[Lit search & read]
+  Mode -->|writing| M2[Write & polish]
+  Mode -->|review| M3[Review & eval]
+  M1 --> T[9 tools · streaming tool-calling]
+  M2 --> T
+  M3 --> T
+  T -->|free academic APIs| API[(OpenAlex · Crossref<br/>Semantic Scholar · arXiv · Unpaywall)]
+  T -->|local sandbox| WS[(workspace/<br/>notes · drafts · reviews · papers)]
+  API --> Claude[(Claude API)]
+  Claude --> Out[Notes / English draft / Review list]
+```
+
 ## Illustrative session
 
-What a literature deep-read looks like (output illustrative, not a live screenshot):
+<details>
+<summary><b>▶ See what a literature deep-read looks like</b> (output illustrative, not a live screenshot)</summary>
 
 ```
 Research Agent · Energy & Power Engineering
@@ -266,6 +307,8 @@ The most-cited is Liu & Chien (2004). Summary:
 
 → written to: workspace/notes/liu-2004-orc-working-fluids.md  (1.8KB)
 ```
+
+</details>
 
 ---
 

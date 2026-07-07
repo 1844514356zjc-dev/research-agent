@@ -1,10 +1,17 @@
-# リサーチエージェント · Energy & Power Engineering
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="Research Agent — Energy & Power Engineering" width="420">
+</p>
 
-[简体中文](README.md) | [English](README.en.md) | **日本語** | [Español](README.es.md) | [Deutsch](README.de.md)
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python"></a>
+  <a href="https://github.com/1844514356zjc-dev/research-agent/actions/workflows/ci.yml"><img src="https://github.com/1844514356zjc-dev/research-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/powered_by-Claude-D97757.svg" alt="powered by Claude">
+</p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
-[![CI](https://github.com/1844514356zjc-dev/research-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/1844514356zjc-dev/research-agent/actions/workflows/ci.yml)
+<p align="center">
+  <a href="README.md">简体中文</a> · <a href="README.en.md">English</a> · <b>日本語</b> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a>
+</p>
 
 > **エネルギー・動力工学向け CLI リサーチアシスタント — 文献精読・論文推敲・査読・研究評価。**
 

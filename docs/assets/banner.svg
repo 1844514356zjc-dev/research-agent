@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 220" text-rendering="geometricPrecision" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0ea5e9"/>
+      <stop offset="1" stop-color="#6366f1"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(320,82)">
+    <circle r="44" fill="none" stroke="url(#g)" stroke-width="6"/>
+    <circle cx="44" cy="0" r="6" fill="#0ea5e9"/>
+    <circle cx="0" cy="44" r="6" fill="#3b82f6"/>
+    <circle cx="-44" cy="0" r="6" fill="#6366f1"/>
+    <circle cx="0" cy="-44" r="6" fill="#06b6d4"/>
+    <path d="M44,-11 L57,0 L44,11" fill="none" stroke="url(#g)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="320" y="170" font-size="34" font-weight="700" fill="#1f2328" text-anchor="middle">Research Agent</text>
+  <text x="320" y="196" font-size="14" fill="#636c76" text-anchor="middle">Energy &amp; Power Engineering · literature · writing · review</text>
+</svg>

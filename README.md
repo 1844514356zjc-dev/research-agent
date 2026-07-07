@@ -1,16 +1,38 @@
-# 科研实用 Agent · Energy & Power Engineering
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="Research Agent — Energy & Power Engineering" width="420">
+</p>
 
-**简体中文** | [English](README.en.md) | [日本語](README.ja.md) | [Español](README.es.md) | [Deutsch](README.de.md)
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python"></a>
+  <a href="https://github.com/1844514356zjc-dev/research-agent/actions/workflows/ci.yml"><img src="https://github.com/1844514356zjc-dev/research-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/powered_by-Claude-D97757.svg" alt="powered by Claude">
+</p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
-[![CI](https://github.com/1844514356zjc-dev/research-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/1844514356zjc-dev/research-agent/actions/workflows/ci.yml)
+<p align="center">
+  <b>简体中文</b> · <a href="README.en.md">English</a> · <a href="README.ja.md">日本語</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a>
+</p>
 
-> **A CLI research assistant for energy & power engineering — literature deep-read, academic polishing, manuscript review.**
+面向**能源/动力工程**研究者的命令行科研助手：在一个终端里完成**文献检索精读、论文写作润色、审稿与思路评估**。提示词内置朗肯/布雷顿/联合循环、ORC、sCO₂、HRSG、㶲分析等本领域术语与目标期刊（Energy、Applied Energy、Applied Thermal Engineering、ECAM、ASME JEGTP）的写作风格。检索全走**免费学术 API**（OpenAlex / Crossref / Semantic Scholar / arXiv / Unpaywall），笔记草稿留在本地 `workspace/`。
 
-面向**能源/动力工程**研究者的命令行科研助手。在一个终端里完成**文献检索精读、论文写作润色、审稿与思路评估**三件日常事。默认中文交流、术语保留英文，系统提示词里内置了朗肯/布雷顿/联合循环、ORC、sCO₂、HRSG、㶲分析等本领域术语与目标期刊（Energy、Applied Energy、Applied Thermal Engineering、ECAM、ASME JEGTP）的写作风格。
+<p align="center"><sub><b>30 秒安装</b></sub></p>
 
-底层是 Claude API；检索全走**免费学术 API**（OpenAlex / Crossref / Semantic Scholar / arXiv / Unpaywall），不需要任何额外 API key。你的笔记、草稿、审稿都存在本地 `workspace/`，不上传任何第三方。
+```bash
+pipx install git+https://github.com/1844514356zjc-dev/research-agent.git
+research-agent   # 首次自动跑配置向导：key / 输出语言 / 模型
+```
+
+## 目录
+
+|  |  |
+|---|---|
+| 🤔 [为什么用它](#为什么用它) | ⚡ [快速开始](#快速开始) |
+| 👥 [适合谁](#适合谁) | 📦 [安装](#安装) |
+| ✨ [特性一览](#特性一览) | 📖 [使用手册](#使用手册) |
+| 🛠️ [工具与数据源](#工具与数据源) | 🧩 [架构](#架构) |
+| ⚙️ [配置](#配置) | 🧪 [典型工作流](#典型工作流) |
+| ❓ [常见问题](#常见问题) | ⚠️ [已知局限](#已知局限) |
+| 🤝 [贡献](#贡献) | 📄 [许可证](#许可证) |
 
 ---
 
@@ -92,7 +114,7 @@ cp .env.example .env   # 或自己新建
 
 ---
 
-## 快速开始（30 秒上手）
+## 快速开始
 
 ```bash
 cd ~/my-research        # 任意你做研究的目录
@@ -237,9 +259,28 @@ research-agent review --model opus
 
 ---
 
-## 示意会话（illustrative）
+## 架构
 
-下面是一次文献精读交互的样子（输出为示意，非实时截图）：
+```mermaid
+flowchart LR
+  U([你 / 研究者]) --> REPL[/REPL · 斜杠命令/]
+  REPL --> Mode{模式}
+  Mode -->|literature| M1[文献检索精读]
+  Mode -->|writing| M2[写作润色]
+  Mode -->|review| M3[审稿评估]
+  M1 --> T[9 个工具 · 流式 tool-calling]
+  M2 --> T
+  M3 --> T
+  T -->|免费学术 API| API[(OpenAlex · Crossref<br/>Semantic Scholar · arXiv · Unpaywall)]
+  T -->|本地沙箱| WS[(workspace/<br/>notes · drafts · reviews · papers)]
+  API --> Claude[(Claude API)]
+  Claude --> Out[笔记 / 英文稿 / 审稿清单]
+```
+
+## 示意会话
+
+<details>
+<summary><b>▶ 点开看一次文献精读交互的样子</b>（输出为示意，非实时截图）</summary>
 
 ```
 科研 Agent · 能源/动力工程
@@ -263,6 +304,8 @@ research-agent review --model opus
 
 → 已写入: workspace/notes/liu-2004-orc-working-fluids.md  (1.8KB)
 ```
+
+</details>
 
 ---
 
