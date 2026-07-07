@@ -1,0 +1,255 @@
+#!/usr/bin/env python3
+"""科研实用 Agent — CLI 入口 + REPL。
+
+用法:
+    python main.py                       # 交互式选模式
+    python main.py literature            # 直入文献模式
+    python main.py writing --model opus  # 写作模式 + opus（审稿推荐）
+"""
+
+from __future__ import annotations
+import argparse
+import glob
+import os
+import shlex
+import sys
+from pathlib import Path
+
+from dotenv import load_dotenv
+from rich.console import Console
+from rich.panel import Panel
+from rich.prompt import Prompt
+from rich.table import Table
+
+from prompts import MODELS, SYSTEM_FOR
+from tools import read_pdf, WORKSPACE
+
+load_dotenv()  # 读 .env 里的 ANTHROPIC_API_KEY / MODEL
+
+console = Console()
+
+HELP = """\
+[命令]（在对话中输入，以 / 开头）
+  /pdf <路径...>       预载一篇或多篇 PDF（支持通配符），如 /pdf ~/Downloads/a.pdf b.pdf
+  /rewrite <路径>      批量改写一个 md/txt 文件：逐节翻译/润色并存新文件
+                       可选 --to en|zh（默认 en）、--style "期刊或风格名"
+  /notes [关键词]      列出已有笔记；给关键词则跨笔记检索
+  /mode <模式>         切换模式：literature / writing / review（清空历史）
+  /model <名>          切换模型：sonnet / opus / haiku 或完整模型 id
+  /save <名>           把当前对话保存到 workspace/notes/对话记录-<名>.md
+  /clear               清空当前模式的历史
+  /help, /?            显示本帮助
+  /quit, /exit         退出
+"""
+
+
+def banner(agent) -> None:
+    table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column(style="cyan", no_wrap=True)
+    table.add_column()
+    table.add_row("模式", agent.mode)
+    table.add_row("模型", agent.model)
+    table.add_row("工作区", str(WORKSPACE))
+    console.print(Panel(table, title="[bold]科研 Agent[/]  ·  能源/动力工程",
+                        border_style="cyan", expand=False))
+    console.print(HELP)
+
+
+def resolve_model(name: str) -> str:
+    key = name.lower()
+    if key in MODELS:
+        return MODELS[key]
+    return name  # 当作完整 model id
+
+
+def choose_mode() -> str:
+    console.print(Panel(
+        "\n[1] 文献检索与精读  literature\n"
+        "[2] 论文写作与润色  writing\n"
+        "[3] 审稿 / 思路评估  review\n",
+        title="选择模式", border_style="cyan"))
+    while True:
+        c = Prompt.ask("模式 [1/2/3]", default="1")
+        m = {"1": "literature", "2": "writing", "3": "review"}.get(c.strip())
+        if m:
+            return m
+        console.print("[red]无效选择[/]")
+
+
+def load_pdfs_into(agent, paths: list[str]) -> None:
+    if not paths:
+        console.print("[red]用法: /pdf <一个或多个路径，支持通配符>[/]")
+        return
+    total = 0
+    for path in paths:
+        text = read_pdf(path)
+        total += len(text)
+        agent.add_user(
+            f"（系统已预载 PDF：{path}\n以下是全文（或部分页），后续问题请基于此回答。）\n\n{text}"
+        )
+        console.print(f"[green]✓ 已预载：{path}[/]")
+    console.print(f"[dim]共载入 {len(paths)} 篇，约 {total} 字符。直接提问即可。[/]")
+
+
+def do_rewrite(agent, arg: str) -> None:
+    """批量改写：读文件 → 逐节翻译/润色 → 用 write_file 存新文件。"""
+    try:
+        toks = shlex.split(arg)
+    except ValueError:
+        toks = arg.split()
+    if not toks:
+        console.print('[red]用法: /rewrite <文件路径> [--to en|zh] [--style "期刊或风格"][/]')
+        return
+    path = toks[0]
+    to, style = "en", ""
+    i = 1
+    while i < len(toks):
+        if toks[i] == "--to" and i + 1 < len(toks):
+            to = toks[i + 1]; i += 2
+        elif toks[i] == "--style" and i + 1 < len(toks):
+            style = toks[i + 1]; i += 2
+        else:
+            i += 1
+    from tools import read_file
+    text = read_file(path)
+    if text.startswith("[") and ("不存在" in text or "失败" in text):
+        console.print(f"[red]{text}[/]")
+        return
+    target = "英文（学术语域）" if to.lower().startswith("en") else "中文"
+    style_hint = f"，风格参考《{style}》" if style else ""
+    prompt = (
+        f"请把下面这份文档逐节改写为{target}{style_hint}。要求：\n"
+        f"1) 保留所有原始数据、单位、变量符号、图表与公式编号；\n"
+        f"2) 按 ## 标题逐节处理，每节先给「原文要点 → 改写」对照；\n"
+        f"3) 专业术语保留英文（如 Rankine cycle、exergy），中→英时用学术语域、避免口语；\n"
+        f"4) 改写完成后，用 write_file 把完整成品存到同一目录的新文件，"
+        f"文件名在原基础上加后缀 -{to}（如 methods.md → methods-{to}.md）。\n\n"
+        f"--- 原文（{path}）---\n{text}"
+    )
+    agent.add_user(prompt)
+    console.print(f"[green]✓ 开始批量改写 {path}（{len(text)} 字符）→ {target}{style_hint}[/]")
+    try:
+        agent.run_turn()
+    except Exception as e:
+        console.print(f"\n[red]✗ 改写出错: {e}[/]")
+
+
+def do_notes(arg: str) -> None:
+    from tools import list_notes, search_notes
+    arg = arg.strip()
+    console.print(search_notes(arg) if arg else list_notes())
+
+
+def save_transcript(agent, name: str) -> None:
+    from tools import write_file
+    parts = [f"# 对话记录 · {agent.mode} · {agent.model}\n"]
+    for m in agent.messages:
+        role = m["role"]
+        c = m["content"]
+        if isinstance(c, str):
+            parts.append(f"\n## {role}\n\n{c}\n")
+        elif isinstance(c, list):
+            for b in c:
+                t = getattr(b, "type", None)
+                if t == "text":
+                    parts.append(f"\n## {role}\n\n{b.text}\n")
+                elif t == "tool_use":
+                    parts.append(f"\n## {role} (tool: {b.name})\n\n```{b.input}```\n")
+                elif t == "tool_result":
+                    pass  # 工具结果体量大，存盘时跳过
+    content = "\n".join(parts)
+    out = write_file(f"notes/对话记录-{name}.md", content)
+    console.print(f"[green]✓ {out}[/]")
+
+
+def repl(agent) -> None:
+    banner(agent)
+    while True:
+        try:
+            user = Prompt.ask("[bold cyan]你[/]")
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n[dim]再见[/]")
+            return
+        if not user.strip():
+            continue
+
+        if user.startswith("/"):
+            cmd, *rest = user[1:].split(None, 1)
+            arg = rest[0].strip() if rest else ""
+            if cmd in ("quit", "exit"):
+                console.print("[dim]再见[/]")
+                return
+            if cmd in ("help", "?"):
+                console.print(HELP)
+                continue
+            if cmd == "mode" and arg in SYSTEM_FOR:
+                agent.reset(arg)
+                console.print(f"[green]✓ 已切换到 {arg} 模式（历史已清空）[/]")
+                continue
+            if cmd == "model" and arg:
+                agent.model = resolve_model(arg)
+                console.print(f"[green]✓ 模型: {agent.model}[/]")
+                continue
+            if cmd == "pdf":
+                if not arg:
+                    console.print("[red]用法: /pdf <一个或多个路径，支持通配符>[/]")
+                    continue
+                paths = []
+                for tok in arg.split():
+                    tok = os.path.expanduser(tok)
+                    matches = sorted(glob.glob(tok))
+                    paths.extend(matches if matches else [tok])
+                load_pdfs_into(agent, paths)
+                continue
+            if cmd == "rewrite" and arg:
+                do_rewrite(agent, arg)
+                continue
+            if cmd == "notes":
+                do_notes(arg)
+                continue
+            if cmd == "save" and arg:
+                save_transcript(agent, arg)
+                continue
+            if cmd == "clear":
+                agent.reset()
+                console.print("[green]✓ 历史已清空[/]")
+                continue
+            console.print("[red]命令无效或参数缺失。/help 查看用法。[/]")
+            continue
+
+        agent.add_user(user)
+        try:
+            agent.run_turn()
+        except Exception as e:
+            console.print(f"\n[red]✗ 出错: {e}[/]")
+            console.print("[dim]可继续输入；若反复出错用 /clear 清空历史。[/]")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="科研实用 Agent — 能源/动力工程")
+    ap.add_argument("mode", nargs="?", choices=list(SYSTEM_FOR),
+                    help="直接进入的模式")
+    ap.add_argument("--model", default=None,
+                    help="模型：sonnet / opus / haiku 或完整 id；默认 sonnet")
+    args = ap.parse_args()
+
+    try:
+        from agent import ResearchAgent
+        agent = ResearchAgent(
+            mode=args.mode or choose_mode(),
+            model=resolve_model(args.model) if args.model else None,
+        )
+    except RuntimeError as e:
+        console.print(f"[red]✗ {e}[/]")
+        console.print("[dim]把 .env.example 复制为 .env 并填入 ANTHROPIC_API_KEY[/]")
+        return 1
+
+    try:
+        repl(agent)
+    except KeyboardInterrupt:
+        console.print("\n[dim]再见[/]")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
