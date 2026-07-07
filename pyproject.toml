@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "research-agent"
+version = "0.1.0"
+description = "能源/动力工程科研助手 — 文献检索精读 / 论文写作润色 / 审稿思路评估"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+authors = [{ name = "1844514356zjc-dev" }]
+keywords = ["research", "academic", "energy", "power-engineering", "claude", "anthropic"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "anthropic>=0.40.0",
+    "pypdf>=4.0.0",
+    "pdfplumber>=0.11.0",
+    "python-dotenv>=1.0.0",
+    "rich>=13.7.0",
+    "requests>=2.31.0",
+]
+
+# 安装后提供 research-agent 命令。注意：采用扁平模块布局（main/agent/tools/prompts
+# 作为顶层模块），简单但会占用顶层命名空间；个人工具够用。
+[project.scripts]
+research-agent = "main:main"
+
+[tool.setuptools]
+py-modules = ["main", "agent", "tools", "prompts"]

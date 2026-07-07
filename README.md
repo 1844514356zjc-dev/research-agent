@@ -1,5 +1,9 @@
 # 科研实用 Agent（能源/动力工程）
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
+[![CI](https://github.com/1844514356zjc-dev/research-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/1844514356zjc-dev/research-agent/actions/workflows/ci.yml)
+
 一个独立运行的 Python 命令行科研助手，覆盖三类日常任务：
 
 - **文献检索与精读** — OpenAlex / Semantic Scholar / Crossref / arXiv 检索（免费、无需 key），开放获取 PDF 下载，双语对照笔记

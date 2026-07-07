@@ -1,0 +1,117 @@
+"""离线确定性测试（无网络、无 API key）— 给 CI 用，也可本地跑：python test_offline.py
+
+只测纯逻辑：去重、规范化、笔记检索、文件读写沙箱、命令行参数解析。
+不触网、不调 Claude API。
+"""
+
+import os
+import shlex
+import sys
+
+import tools
+
+
+def test_normalize_doi():
+    assert tools._normalize_doi("https://doi.org/10.1/A ") == "10.1/a"
+    assert tools._normalize_doi("DOI:10.1/x") == "10.1/x"
+    assert tools._normalize_doi(None) is None
+    assert tools._normalize_doi("") is None
+
+
+def test_normalize_title():
+    assert tools._normalize_title("ORC, Cycle!") == "orc cycle"
+    assert tools._normalize_title("  Supercritical  CO₂ ") == "supercritical co"
+
+
+def test_dedupe_merges_by_title_when_one_lacks_doi():
+    recs = [
+        {"title": "ORC for Waste Heat", "doi": "10.1/a", "cited_by_count": 100, "source": "openalex"},
+        {"title": "orc for waste heat!", "doi": None, "cited_by_count": 80, "source": "crossref"},
+        {"title": "Another Paper", "doi": "10.1/b", "cited_by_count": 50, "source": "openalex"},
+    ]
+    # 两种顺序都应合并成 2 条
+    for order in (recs, list(reversed(recs))):
+        d = tools._dedupe(order)
+        assert len(d) == 2, f"期望 2 条，实际 {len(d)}"
+        assert any(r.get("sources") == "crossref+openalex" for r in d), "应有合并自两源的记录"
+        # 引用数取最大
+        merged = next(r for r in d if tools._normalize_doi(r.get("doi")) == "10.1/a")
+        assert merged["cited_by_count"] == 100
+
+
+def test_dedupe_same_doi_different_title_merges():
+    recs = [
+        {"title": "Title One", "doi": "10.1/x", "cited_by_count": 10, "source": "openalex"},
+        {"title": "Totally Different", "doi": "10.1/x", "cited_by_count": 20, "source": "crossref"},
+    ]
+    d = tools._dedupe(recs)
+    assert len(d) == 1, f"同 DOI 应合并: {len(d)}"
+    assert d[0]["cited_by_count"] == 20
+
+
+def test_notes_search_and_list():
+    tools.write_file("notes/_test_.md",
+                     "# ORC Test\n\n有机朗肯循环（ORC）工质筛选，R245fa 最佳。\n\n## 方法\n采用㶲分析。")
+    try:
+        r = tools.search_notes("orc 工质")
+        assert "R245fa" in r and "匹配 2 词" in r, f"应命中且计分 2: {r[:120]}"
+        # 无匹配
+        nm = tools.search_notes("不存在的词zzz")
+        assert "无匹配" in nm
+        # 列表
+        lst = tools.list_notes()
+        assert "_test_" in lst
+    finally:
+        os.remove(str(tools.WORKSPACE / "notes" / "_test_.md"))
+
+
+def test_write_read_roundtrip():
+    tools.write_file("notes/_wr_.md", "hello world")
+    try:
+        assert "hello world" in tools.read_file("notes/_wr_.md")
+    finally:
+        os.remove(str(tools.WORKSPACE / "notes" / "_wr_.md"))
+
+
+def test_write_sandbox_blocks_escape():
+    # workspace 之外的绝对路径应被拒
+    r = tools.write_file("/tmp/_escape_attempt_.md", "x")
+    assert "拒绝" in r, f"应拒绝 workspace 外写入: {r}"
+    assert not os.path.exists("/tmp/_escape_attempt_.md")
+
+
+def test_rewrite_arg_parsing():
+    # 复刻 main.do_rewrite 的 shlex 解析逻辑
+    toks = shlex.split('drafts/m.md --to en --style "Applied Energy"')
+    assert toks[0] == "drafts/m.md"
+    to, style, i = "en", "", 1
+    while i < len(toks):
+        if toks[i] == "--to" and i + 1 < len(toks):
+            to = toks[i + 1]; i += 2
+        elif toks[i] == "--style" and i + 1 < len(toks):
+            style = toks[i + 1]; i += 2
+        else:
+            i += 1
+    assert to == "en" and style == "Applied Energy"
+
+
+def _run_all():
+    tests = [(k, v) for k, v in sorted(globals().items())
+             if k.startswith("test_") and callable(v)]
+    failed = 0
+    for name, fn in tests:
+        try:
+            fn()
+            print(f"  ✓ {name}")
+        except AssertionError as e:
+            failed += 1
+            print(f"  ✗ {name}: {e}")
+        except Exception as e:
+            failed += 1
+            print(f"  ✗ {name}: {type(e).__name__}: {e}")
+    print(f"\n{len(tests) - failed}/{len(tests)} passed")
+    return failed
+
+
+if __name__ == "__main__":
+    sys.exit(1 if _run_all() else 0)
