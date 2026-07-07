@@ -15,10 +15,15 @@ from pathlib import Path
 
 import requests
 
-WORKSPACE = Path(__file__).resolve().parent / "workspace"
-WORKSPACE.mkdir(exist_ok=True)
-for sub in ("notes", "drafts", "reviews", "papers"):
-    (WORKSPACE / sub).mkdir(exist_ok=True)
+# workspace 跟随"调用目录"而非模块所在目录：装成 research-agent 命令后，
+# 在哪个目录运行，workspace/ 就出现在哪里。只读目录下不强求创建。
+WORKSPACE = Path.cwd() / "workspace"
+try:
+    WORKSPACE.mkdir(exist_ok=True)
+    for sub in ("notes", "drafts", "reviews", "papers"):
+        (WORKSPACE / sub).mkdir(exist_ok=True)
+except OSError:
+    pass
 
 EMAIL = os.getenv("UNPAYWALL_EMAIL") or "research-agent@users.noreply.github.com"
 HEADERS = {"User-Agent": f"research-agent/0.1 (mailto:{EMAIL})"}
