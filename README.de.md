@@ -40,9 +40,9 @@ Es gibt viele KI-Forschungstools; dieses trifft ein paar andere Entscheidungen:
 
 - Masterstudierende, Doktoranden und Nachwuchsforschende in Energie- und Antriebstechnik sowie Nachbarfeldern (Erneuerbare, Kerntechnik, Kältetechnik/HVAC, Thermomanagement, Multivektorsysteme)
 - Wer oft *"ein neues Papier schnell verstehen"*, *"einen chinesischen Methodenabschnitt ins Englische für die Einreichung bringen"* oder *"vor der Einreichung selbst prüfen"* muss
-- Menschen, die mit der Kommandozeile vertraut sind, einen eigenen Anthropic-API-Schlüssel haben und ihre Entwürfe lieber nicht in Web-Tools einfügen
+- Menschen, die mit der Kommandozeile vertraut sind, einen eigenen API-Schlüssel haben (Anthropic direkt oder via Proxy) und ihre Entwürfe lieber nicht in Web-Tools einfügen
 
-> Nicht geeignet für: Personen, die eine GUI brauchen, keinen Anthropic-API-Schlüssel haben oder erwarten, dass das Tool seine API-Rechnung selbst trägt.
+> Nicht geeignet für: Personen, die eine GUI brauchen, keinen API-Schlüssel haben oder erwarten, dass das Tool seine API-Rechnung selbst trägt.
 
 ## Funktionen
 
@@ -60,7 +60,7 @@ Es gibt viele KI-Forschungstools; dieses trifft ein paar andere Entscheidungen:
 
 ## Installation
 
-Benötigt Python 3.11+ und einen [Anthropic-API-Schlüssel](https://console.anthropic.com).
+Benötigt Python 3.11+ und einen API-Schlüssel (Anthropic direkt oder den deines Proxys).
 
 ### Option A: pipx (empfohlen, isoliert)
 
@@ -91,7 +91,7 @@ Lege eine `.env` **im Ausführungsverzeichnis** an (oder exportiere die Variable
 ```bash
 cp .env.example .env   # oder neu anlegen
 # .env bearbeiten:
-#   ANTHROPIC_API_KEY=sk-ant-...        (erforderlich, https://console.anthropic.com)
+#   ANTHROPIC_API_KEY=sk-ant-...        (erforderlich — Anthropic-Schlüssel oder der deines Proxys)
 #   UNPAYWALL_EMAIL=you@your-school.edu  (optional, echte Adresse — verbessert OA-PDF-Suche)
 #   MODEL=claude-sonnet-5                (optional, überschreibt Standardmodell)
 ```
@@ -307,7 +307,7 @@ research-agent/
 
 ## Bekannte Einschränkungen
 
-- Benötigt Anthropic-API-Schlüssel (abrechnungspflichtige Nutzung, zu deinen Lasten)
+- Benötigt API-Schlüssel (Anthropic direkt oder via Proxy; abrechnungspflichtige Nutzung, zu deinen Lasten)
 - Standard-Ausgabesprache ist Chinesisch (zum Wechseln auffordern oder `prompts.py` ändern)
 - Notizsuche ist stichwortbasiert, nicht semantisch/vektoriell
 - Nur OA-Volltext-PDFs; Nicht-OA nur Metadaten

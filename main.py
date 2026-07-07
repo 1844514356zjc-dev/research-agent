@@ -109,11 +109,11 @@ def run_setup_wizard() -> bool:
     """交互式配置 .env。返回 True 表示已写入 key。"""
     console.print(Panel(
         "首次使用？我来帮你配置（30 秒）。\n"
-        "需要：Anthropic API key —— 在 https://console.anthropic.com → API Keys 获取。",
+        "需要：一个 API key——直连用 Anthropic 的（console.anthropic.com），走代理用代理的。",
         title="[bold]首次运行向导[/]", border_style="cyan"))
 
     try:
-        key = Prompt.ask("1) Anthropic API key（输入时不显示）", password=True).strip()
+        key = Prompt.ask("1) API key（直连填 Anthropic 的；走代理填代理的）", password=True).strip()
         if not key:
             console.print("[yellow]未提供 key，向导中止。配置好后重试。[/]")
             return False

@@ -55,9 +55,9 @@ Plenty of AI research tools exist. This one makes a few different trade-offs:
 
 - Graduate students, PhDs, and early-career researchers in energy & power engineering and adjacent fields (renewables, nuclear, refrigeration/HVAC, thermal management, multi-energy systems)
 - Anyone who often needs to *"quickly understand a new paper"*, *"turn a Chinese methods section into English for submission"*, or *"self-check before submission"*
-- People comfortable with the command line, with their own Anthropic API key, who'd rather not paste drafts into web tools
+- People comfortable with the command line, with their own API key (Anthropic direct, or a proxy's), who'd rather not paste drafts into web tools
 
-> Not for: people who need a GUI, have no Anthropic API key, or want the tool to pay its own API bill.
+> Not for: people who need a GUI, have no API key, or want the tool to pay its own API bill.
 
 ## Features
 
@@ -75,7 +75,7 @@ Plenty of AI research tools exist. This one makes a few different trade-offs:
 
 ## Installation
 
-Requires Python 3.11+ and an [Anthropic API key](https://console.anthropic.com).
+Requires Python 3.11+ and an API key — Anthropic's for direct use, or your proxy's (see *Use a proxy* below).
 
 ### Option A: pipx (recommended, isolated)
 
@@ -106,7 +106,7 @@ Create a `.env` in **the directory you'll run from** (or export env vars any way
 ```bash
 cp .env.example .env   # or create it
 # Edit .env:
-#   ANTHROPIC_API_KEY=sk-ant-...        (required, https://console.anthropic.com)
+#   ANTHROPIC_API_KEY=sk-ant-...        (required — Anthropic's key, or your proxy's)
 #   OUTPUT_LANG=en                       (optional: zh/en/ja/es/de; auto-detected if unset)
 #   UNPAYWALL_EMAIL=you@your-school.edu  (optional, real email — helps find OA PDFs)
 #   MODEL=claude-sonnet-5                (optional, override default model)
@@ -382,7 +382,7 @@ research-agent/
 
 ## Limitations
 
-- Requires an Anthropic API key (billed per use, on you)
+- Requires an API key (direct Anthropic, or via proxy; billed per use, on you)
 - Default output language is Chinese (ask it to switch, or edit `prompts.py`)
 - Note search is keyword-based, not semantic/vector
 - Only open-access full-text PDFs; non-OA papers return metadata only

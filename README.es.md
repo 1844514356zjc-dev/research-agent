@@ -40,9 +40,9 @@ Hay muchas herramientas de investigación con IA; esta toma algunas decisiones d
 
 - Estudiantes de posgrado, doctorandos e investigadores jóvenes en ingeniería energética y de la potencia, y áreas afines (renovables, nuclear, refrigeración y HVAC, gestión térmica, sistemas multienergéticos)
 - Quien necesite a menudo *"entender rápido un artículo nuevo"*, *"pasar una sección de Métodos del chino al inglés para envío"*, o *"revisión propia antes de enviar"*
-- Personas cómodas con la línea de comandos, con su propia clave API de Anthropic, que prefieren no pegar borradores en herramientas web
+- Personas cómodas con la línea de comandos, con su propia clave API (de Anthropic en directo, o de tu proxy), que prefieren no pegar borradores en herramientas web
 
-> No es para: quien necesite interfaz gráfica, no tenga clave API de Anthropic, o espere que la herramienta pague su propia factura de API.
+> No es para: quien necesite interfaz gráfica, no tenga clave API, o espere que la herramienta pague su propia factura de API.
 
 ## Funcionalidades
 
@@ -60,7 +60,7 @@ Hay muchas herramientas de investigación con IA; esta toma algunas decisiones d
 
 ## Instalación
 
-Necesitas Python 3.11+ y una [clave API de Anthropic](https://console.anthropic.com).
+Necesitas Python 3.11+ y una clave API (de Anthropic en directo, o de tu proxy).
 
 ### Opción A: pipx (recomendado, aislado)
 
@@ -91,7 +91,7 @@ Crea un `.env` en **el directorio desde donde ejecutarás** (o exporta las varia
 ```bash
 cp .env.example .env   # o créalo
 # Edita .env:
-#   ANTHROPIC_API_KEY=sk-ant-...        (obligatorio, https://console.anthropic.com)
+#   ANTHROPIC_API_KEY=sk-ant-...        (obligatorio — clave de Anthropic o de tu proxy)
 #   UNPAYWALL_EMAIL=you@your-school.edu  (opcional, correo real — mejora la búsqueda de PDFs OA)
 #   MODEL=claude-sonnet-5                (opcional, sobreescribe el modelo por defecto)
 ```
@@ -307,7 +307,7 @@ research-agent/
 
 ## Limitaciones conocidas
 
-- Requiere clave API de Anthropic (uso facturado, a tu cargo)
+- Requiere clave API (Anthropic en directo o vía proxy; uso facturado, a tu cargo)
 - El idioma por defecto es chino (pídele cambiarlo o edita `prompts.py`)
 - La búsqueda de notas es por palabras clave, no semántica/vectorial
 - Solo PDFs de texto completo en acceso abierto; los no-OA devuelven solo metadatos

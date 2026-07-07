@@ -51,9 +51,9 @@ research-agent   # 首次自动跑配置向导：key / 输出语言 / 模型
 
 - 能源/动力工程，以及相邻方向（可再生能源、核能、制冷与空调、热管理、多能互补）的研究生、博士生、青年研究者
 - 经常要做"快速看懂一篇新论文""把中文方法段改成英文投稿""投稿前自查"的人
-- 习惯命令行、有自己的 Anthropic API key、不想把稿子和数据塞进网页工具的人
+- 习惯命令行、有自己的 API key（直连 Anthropic 或走代理）、不想把稿子和数据塞进网页工具的人
 
-> 不适合：需要图形界面、没有 Anthropic API key、或希望工具自己付 API 账单的人。
+> 不适合：需要图形界面、没有任何 API key（直连或代理）、或希望工具自己付 API 账单的人。
 
 ## 特性一览
 
@@ -71,7 +71,7 @@ research-agent   # 首次自动跑配置向导：key / 输出语言 / 模型
 
 ## 安装
 
-需要 Python 3.11+ 和一个 [Anthropic API key](https://console.anthropic.com)。
+需要 Python 3.11+ 和一个 API key——直连用 [Anthropic](https://console.anthropic.com) 的，走代理用代理的（见下方「走代理」小节）。
 
 ### 方式一：pipx（推荐，最干净）
 
@@ -102,7 +102,7 @@ pip install -r requirements.txt
 ```bash
 cp .env.example .env   # 或自己新建
 # 编辑 .env：
-#   ANTHROPIC_API_KEY=sk-ant-...        （必填，https://console.anthropic.com）
+#   ANTHROPIC_API_KEY=sk-ant-...        （必填——Anthropic 的 key，或代理的 key）
 #   OUTPUT_LANG=zh                       （选填：zh/en/ja/es/de，不设则按系统语言）
 #   UNPAYWALL_EMAIL=you@your-school.edu  （选填，填真实邮箱，找 OA PDF 更顺）
 #   MODEL=claude-sonnet-5                （选填，覆盖默认模型）
@@ -379,7 +379,7 @@ research-agent/
 
 ## 已知局限
 
-- 需要 Anthropic API key，调用按量计费（用户自理）
+- 需要 API key（直连 Anthropic，或走代理用 DeepSeek/Qwen 等）；调用按量计费（用户自理）
 - 笔记检索是关键词匹配，没有向量语义检索
 - 只能获取开放获取的全文 PDF，非 OA 论文只能拿到元数据
 - arXiv / Semantic Scholar 偶有波动或限流，代码侧已优雅降级
