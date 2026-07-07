@@ -405,7 +405,17 @@ def read_pdf(path: str, pages: str | None = None) -> str:
                 return f"[PDF {total} 页，但指定页码无效]"
     except Exception as e:
         return f"[读取 PDF 失败: {e}]"
-    return _truncate("\n\n".join(text_parts) + f"\n\n[共 {total} 页]")
+    body = "\n\n".join(text_parts)
+    pages_read = len(text_parts)
+    total_chars = len(body)
+    # 扫描件检测：平均每页提取的字符过少，多半是图像扫描件，没有文本层
+    warning = ""
+    if pages_read > 0 and total_chars / pages_read < 50:
+        warning = ("\n\n⚠ 提取到的文字极少（平均每页不足 50 字符）。"
+                   "这份 PDF 很可能是扫描件（图像），没有可读文本层。"
+                   "建议先用 OCR 工具（如 ocrmypdf、Tesseract、Adobe Acrobat 的 OCR）"
+                   "转成带文本层的 PDF，再重新读取。")
+    return _truncate(body + f"\n\n[共 {total} 页]" + warning)
 
 
 def _parse_pages(spec: str | None) -> list[int] | None:

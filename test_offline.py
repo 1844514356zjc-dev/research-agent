@@ -95,6 +95,51 @@ def test_rewrite_arg_parsing():
     assert to == "en" and style == "Applied Energy"
 
 
+def test_prompts_system_for_all_modes_and_langs():
+    import prompts
+    for mode in prompts.MODES:
+        s = prompts.system_for(mode)
+        assert isinstance(s, str) and len(s) > 200, f"{mode} 提示词过短"
+        assert "当前模式" in s, f"{mode} 缺少模式标记"
+        for lang in prompts.SUPPORTED_LANGS:
+            s = prompts.system_for(mode, lang)
+            assert isinstance(s, str) and len(s) > 200, f"{mode}/{lang} 过短"
+    # 无效模式应抛错
+    try:
+        prompts.system_for("nope"); assert False, "应抛 ValueError"
+    except ValueError:
+        pass
+
+
+def test_prompts_examples_present():
+    import prompts
+    for mode in prompts.MODES:
+        for lang in prompts.SUPPORTED_LANGS:
+            ex = prompts.examples_for(mode, lang)
+            assert ex and len(ex) >= 2, f"{mode}/{lang} 缺示例"
+
+
+def test_lang_detection_returns_supported():
+    import prompts
+    assert prompts._detect_lang.__call__  # 可调用
+    # OUTPUT_LANG 优先
+    import os
+    old = os.environ.get("OUTPUT_LANG")
+    try:
+        os.environ["OUTPUT_LANG"] = "ja"
+        assert prompts._detect_lang() == "ja"
+        os.environ["OUTPUT_LANG"] = "es"
+        assert prompts._detect_lang() == "es"
+        os.environ.pop("OUTPUT_LANG", None)
+        # 无 OUTPUT_LANG 时也应返回受支持代码（默认 zh 或系统语言）
+        assert prompts._detect_lang() in prompts.SUPPORTED_LANGS
+    finally:
+        if old is not None:
+            os.environ["OUTPUT_LANG"] = old
+        else:
+            os.environ.pop("OUTPUT_LANG", None)
+
+
 def _run_all():
     tests = [(k, v) for k, v in sorted(globals().items())
              if k.startswith("test_") and callable(v)]

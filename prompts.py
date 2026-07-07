@@ -1,4 +1,7 @@
-"""三模式系统提示词 + 能源/动力工程领域知识。"""
+"""三模式系统提示词 + 能源/动力工程领域知识 + 输出语言控制。"""
+
+import locale
+import os
 
 DOMAIN_KNOWLEDGE = """\
 你深谙能源与动力工程（Energy & Power Engineering）领域，熟悉以下内容：
@@ -35,17 +38,60 @@ DOMAIN_KNOWLEDGE = """\
 - 敏感性分析只变一个参数、未做耦合分析
 """
 
-_BASE = f"""\
+# ---------------------------------------------------------------------------
+# 输出语言：OUTPUT_LANG 环境变量 > 系统语言 > 默认中文（工具中文优先）
+# ---------------------------------------------------------------------------
+
+LANG_LABELS = {"zh": "中文", "en": "English", "ja": "日本語", "es": "Español", "de": "Deutsch"}
+SUPPORTED_LANGS = tuple(LANG_LABELS.keys())
+
+
+def _detect_lang() -> str:
+    explicit = (os.getenv("OUTPUT_LANG") or "").strip().lower()
+    if explicit[:2] in LANG_LABELS:
+        return explicit[:2]
+    # 系统语言：LANG / LC_ALL / locale
+    loc = (os.getenv("LANG") or os.getenv("LC_ALL") or os.getenv("LC_CTYPE") or "").lower()
+    if not loc:
+        try:
+            got = locale.getlocale()[0]
+            loc = (got or "").lower()
+        except Exception:
+            loc = ""
+    for code in SUPPORTED_LANGS:
+        if loc.startswith(code):
+            return code
+    return "zh"
+
+
+OUTPUT_LANG = _detect_lang()
+
+
+def _lang_instruction(lang: str) -> str:
+    """告诉模型默认用什么语言回答。指令本身用中文写，模型会照样输出目标语言。"""
+    return {
+        "zh": "默认用中文回答，专业术语保留英文，例如 朗肯循环 Rankine cycle。",
+        "en": "Respond in English by default; keep standard technical terms as-is.",
+        "ja": "既定で日本語で答えること。専門用語は英語のまま使うこと。",
+        "es": "Responde por defecto en español; conserva los términos técnicos estándar.",
+        "de": "Antworte standardmäßig auf Deutsch; behalte Fachbegriffe bei.",
+    }.get(lang, "默认用中文回答，专业术语保留英文。")
+
+
+def _base(lang: str) -> str:
+    return f"""\
 你是面向能源/动力工程研究者的科研助手。{DOMAIN_KNOWLEDGE}
 
 通用规则：
-- 默认用中文回答，专业术语保留英文（如"朗肯循环（Rankine cycle）"）。
+- {_lang_instruction(lang)}
 - 检索文献时先用工具查证，不要凭记忆编造 DOI/作者/数字。引用时给出可核验来源。
 - 涉及具体数值（效率、温度、压力、流量）时，注明单位与工况条件。
 - 写文件用 markdown，路径限制在 workspace/ 下。
 """
 
-LITERATURE_SYSTEM = _BASE + """\
+
+_MODE_SECTIONS = {
+    "literature": """\
 
 【当前模式：文献检索与精读】
 工作流（按需调用工具）：
@@ -65,9 +111,8 @@ LITERATURE_SYSTEM = _BASE + """\
    - 对用户研究的启示
 5. 用 write_file 把笔记存到 workspace/notes/（建议 文件名 = 首作者-年-关键词.md）。
 引用时务必给出 DOI 或可核验链接，不要杜撰。
-"""
-
-WRITING_SYSTEM = _BASE + """\
+""",
+    "writing": """\
 
 【当前模式：论文写作与润色】
 原则：
@@ -84,9 +129,8 @@ WRITING_SYSTEM = _BASE + """\
   保留数据/单位/变量符号/图表与公式编号；最后用 write_file 存完整成品。
 - 用户用 /rewrite 命令时，会自动把文件内容作为任务发给你，按上述规则执行即可。
 - 用 write_file 把成品存到 workspace/drafts/。
-"""
-
-REVIEW_SYSTEM = _BASE + """\
+""",
+    "review": """\
 
 【当前模式：审稿 / 思路评估】
 你扮演本领域严格的同行评审。流程：
@@ -100,13 +144,96 @@ REVIEW_SYSTEM = _BASE + """\
 4. 给出"必改（major）/建议改（minor）"清单与可执行的修改方向。
 5. 末尾给总体结论（接收/小修/大修/拒）与一句话理由。
 用 write_file 存到 workspace/reviews/。
-"""
-
-SYSTEM_FOR = {
-    "literature": LITERATURE_SYSTEM,
-    "writing": WRITING_SYSTEM,
-    "review": REVIEW_SYSTEM,
+""",
 }
+
+MODES = ("literature", "writing", "review")
+
+
+def system_for(mode: str, lang: str | None = None) -> str:
+    if mode not in _MODE_SECTIONS:
+        raise ValueError(f"未知模式: {mode}（可选: {list(MODES)}）")
+    return _base(lang or OUTPUT_LANG) + _MODE_SECTIONS[mode]
+
+
+# ---------------------------------------------------------------------------
+# 每个模式的开场示例（按输出语言），用于 banner 与 /examples
+# ---------------------------------------------------------------------------
+
+EXAMPLES: dict[str, dict[str, list[str]]] = {
+    "literature": {
+        "zh": [
+            "检索 ORC 工质筛选近 5 年高被引论文，精读最高引用那篇并出中文笔记",
+            "DOI 10.1016/j.energy.2019.115900 是讲什么的？给我笔记",
+        ],
+        "en": [
+            "Search highly-cited ORC working-fluid papers from the last 5 years; deep-read the top one and write notes",
+            "What is DOI 10.1016/j.energy.2019.115900 about? Give me notes",
+        ],
+        "ja": [
+            "過去5年の ORC 作動流体に関する高引用論文を検索し、最上位を精読してノートを作成",
+            "DOI 10.1016/j.energy.2019.115900 は何の論文？ ノートを",
+        ],
+        "es": [
+            "Busca artículos muy citados sobre selección de fluidos en ORC de los últimos 5 años; lee el primero y redacta notas",
+            "¿De qué trata el DOI 10.1016/j.energy.2019.115900? Dame notas",
+        ],
+        "de": [
+            "Suche stark zitierte ORC-Arbeitsstoff-Arbeiten der letzten 5 Jahre; lies die oberste und erstelle Notizen",
+            "Worum geht es bei DOI 10.1016/j.energy.2019.115900? Notizen bitte",
+        ],
+    },
+    "writing": {
+        "zh": [
+            "把下面这段中文方法改写成 Applied Energy 风格英文：……",
+            '/rewrite drafts/methods.md --to en --style "Applied Energy"',
+        ],
+        "en": [
+            "Rewrite this Chinese methods paragraph in Applied Energy style: …",
+            '/rewrite drafts/methods.md --to en --style "Applied Energy"',
+        ],
+        "ja": [
+            "以下の日本語メソッド章を Applied Energy 体裁の英語に書き直して：……",
+            '/rewrite drafts/methods.md --to en --style "Applied Energy"',
+        ],
+        "es": [
+            "Reescribe este párrafo de métodos al estilo de Applied Energy: …",
+            '/rewrite drafts/methods.md --to en --style "Applied Energy"',
+        ],
+        "de": [
+            "Schreibe diesen Methodenabschnitt im Stil von Applied Energy um: …",
+            '/rewrite drafts/methods.md --to en --style "Applied Energy"',
+        ],
+    },
+    "review": {
+        "zh": [
+            "/pdf ~/Downloads/manuscript.pdf 然后 评估创新性与方法严谨性",
+            "评估这个研究思路的可行性：……",
+        ],
+        "en": [
+            "/pdf ~/Downloads/manuscript.pdf then evaluate novelty and rigor",
+            "Evaluate the feasibility of this research idea: …",
+        ],
+        "ja": [
+            "/pdf ~/Downloads/manuscript.pdf のあと 新規性と厳密性を評価",
+            "この研究アイデアの実現可能性を評価して：……",
+        ],
+        "es": [
+            "/pdf ~/Downloads/manuscript.pdf luego evalúa novedad y rigor",
+            "Evalúa la viabilidad de esta idea de investigación: …",
+        ],
+        "de": [
+            "/pdf ~/Downloads/manuscript.pdf dann Neuheit und Stringenz bewerten",
+            "Bewerte die Umsetzbarkeit dieser Forschungsidee: …",
+        ],
+    },
+}
+
+
+def examples_for(mode: str, lang: str | None = None) -> list[str]:
+    lang = lang or OUTPUT_LANG
+    return EXAMPLES.get(mode, {}).get(lang) or EXAMPLES.get(mode, {}).get("en") or []
+
 
 MODELS = {
     "sonnet": "claude-sonnet-5",

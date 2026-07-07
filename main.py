@@ -2,9 +2,9 @@
 """科研实用 Agent — CLI 入口 + REPL。
 
 用法:
-    python main.py                       # 交互式选模式
-    python main.py literature            # 直入文献模式
-    python main.py writing --model opus  # 写作模式 + opus（审稿推荐）
+    research-agent                       # 交互式选模式（首次自动跑配置向导）
+    research-agent literature            # 直入文献模式
+    research-agent writing --model opus  # 写作模式 + opus（审稿推荐）
 """
 
 from __future__ import annotations
@@ -21,21 +21,26 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
 
-from prompts import MODELS, SYSTEM_FOR
+from prompts import (MODELS, MODES, OUTPUT_LANG, LANG_LABELS,
+                     SUPPORTED_LANGS, examples_for)
 from tools import read_pdf, WORKSPACE
 
-load_dotenv()  # 读 .env 里的 ANTHROPIC_API_KEY / MODEL
+load_dotenv()  # 读 .env 里的 ANTHROPIC_API_KEY / MODEL / OUTPUT_LANG
 
 console = Console()
 
 HELP = """\
 [命令]（在对话中输入，以 / 开头）
-  /pdf <路径...>       预载一篇或多篇 PDF（支持通配符），如 /pdf ~/Downloads/a.pdf b.pdf
+  /examples            显示当前模式的示例提问
+  /pdf <路径...>       预载一篇或多篇 PDF（支持通配符），如 /pdf ~/Downloads/*.pdf
   /rewrite <路径>      批量改写一个 md/txt 文件：逐节翻译/润色并存新文件
                        可选 --to en|zh（默认 en）、--style "期刊或风格名"
   /notes [关键词]      列出已有笔记；给关键词则跨笔记检索
   /mode <模式>         切换模式：literature / writing / review（清空历史）
   /model <名>          切换模型：sonnet / opus / haiku 或完整模型 id
+  /lang <zh|en|ja|es|de>  实时切换输出语言
+  /usage               查看本会话 token 用量
+  /status              查看当前状态（模式/语言/模型/工作区/消息数/用量）
   /save <名>           把当前对话保存到 workspace/notes/对话记录-<名>.md
   /clear               清空当前模式的历史
   /help, /?            显示本帮助
@@ -43,23 +48,29 @@ HELP = """\
 """
 
 
-def banner(agent) -> None:
-    table = Table(show_header=False, box=None, padding=(0, 2))
-    table.add_column(style="cyan", no_wrap=True)
-    table.add_column()
-    table.add_row("模式", agent.mode)
-    table.add_row("模型", agent.model)
-    table.add_row("工作区", str(WORKSPACE))
-    console.print(Panel(table, title="[bold]科研 Agent[/]  ·  能源/动力工程",
-                        border_style="cyan", expand=False))
-    console.print(HELP)
-
-
 def resolve_model(name: str) -> str:
     key = name.lower()
     if key in MODELS:
         return MODELS[key]
     return name  # 当作完整 model id
+
+
+def banner(agent) -> None:
+    table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column(style="cyan", no_wrap=True)
+    table.add_column()
+    table.add_row("模式", agent.mode)
+    table.add_row("输出语言", f"{agent.lang}（{LANG_LABELS.get(agent.lang, '?')}）")
+    table.add_row("模型", agent.model)
+    table.add_row("工作区", str(WORKSPACE))
+    console.print(Panel(table, title="[bold]科研 Agent[/]  ·  能源/动力工程",
+                        border_style="cyan", expand=False))
+    ex = examples_for(agent.mode, agent.lang)
+    if ex:
+        console.print("[dim]试试这些（直接输入即可）：[/]")
+        for e in ex:
+            console.print(f"  [cyan]•[/] {e}")
+    console.print(f"\n[dim]输入 /help 看全部命令；/examples 看更多示例。[/]")
 
 
 def choose_mode() -> str:
@@ -75,6 +86,64 @@ def choose_mode() -> str:
             return m
         console.print("[red]无效选择[/]")
 
+
+# ---------------------------------------------------------------------------
+# 首次运行向导：检测不到 API key 时引导配置 .env
+# ---------------------------------------------------------------------------
+
+def _write_env(values: dict[str, str]) -> None:
+    """把 values 写入 cwd 的 .env，保留不在 values 里的既有行。"""
+    path = Path(".env")
+    keep: list[str] = []
+    if path.exists():
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            k = line.split("=", 1)[0].strip()
+            if k and k not in values:
+                keep.append(line)
+    out = keep + [f"{k}={v}" for k, v in values.items()]
+    path.write_text("\n".join(out) + "\n", encoding="utf-8")
+
+
+def run_setup_wizard() -> bool:
+    """交互式配置 .env。返回 True 表示已写入 key。"""
+    console.print(Panel(
+        "首次使用？我来帮你配置（30 秒）。\n"
+        "需要：Anthropic API key —— 在 https://console.anthropic.com → API Keys 获取。",
+        title="[bold]首次运行向导[/]", border_style="cyan"))
+
+    try:
+        key = Prompt.ask("1) Anthropic API key（输入时不显示）", password=True).strip()
+        if not key:
+            console.print("[yellow]未提供 key，向导中止。配置好后重试。[/]")
+            return False
+
+        detected = OUTPUT_LANG
+        console.print(f"2) 输出语言（检测到系统语言：[cyan]{detected}[/]，"
+                      f"可选 {'/'.join(SUPPORTED_LANGS)}）")
+        lang = Prompt.ask("   输出语言", default=detected).strip().lower()[:2]
+        if lang not in LANG_LABELS:
+            lang = detected
+
+        console.print("3) 默认模型：sonnet（推荐，日常够用）/ opus（深度审稿）/ haiku（最快最省）")
+        model_in = Prompt.ask("   默认模型", default="sonnet").strip().lower()
+        model_id = resolve_model(model_in) if model_in else "claude-sonnet-5"
+    except (EOFError, KeyboardInterrupt):
+        console.print("\n[yellow]向导已取消。[/]")
+        return False
+
+    _write_env({
+        "ANTHROPIC_API_KEY": key,
+        "OUTPUT_LANG": lang,
+        "MODEL": model_id,
+    })
+    console.print(f"[green]✓ 已写入 .env（输出语言: {LANG_LABELS[lang]}，模型: {model_id}）[/]")
+    load_dotenv(override=True)
+    return True
+
+
+# ---------------------------------------------------------------------------
+# 斜杠命令实现
+# ---------------------------------------------------------------------------
 
 def load_pdfs_into(agent, paths: list[str]) -> None:
     if not paths:
@@ -140,6 +209,19 @@ def do_notes(arg: str) -> None:
     console.print(search_notes(arg) if arg else list_notes())
 
 
+def do_status(agent) -> None:
+    t = Table(show_header=False, box=None, padding=(0, 2))
+    t.add_column(style="cyan", no_wrap=True)
+    t.add_column()
+    t.add_row("模式", agent.mode)
+    t.add_row("输出语言", f"{agent.lang}（{LANG_LABELS.get(agent.lang, '?')}）")
+    t.add_row("模型", agent.model)
+    t.add_row("工作区", str(WORKSPACE))
+    t.add_row("消息数", str(len(agent.messages)))
+    t.add_row("用量", agent.usage_summary())
+    console.print(t)
+
+
 def save_transcript(agent, name: str) -> None:
     from tools import write_file
     parts = [f"# 对话记录 · {agent.mode} · {agent.model}\n"]
@@ -182,13 +264,36 @@ def repl(agent) -> None:
             if cmd in ("help", "?"):
                 console.print(HELP)
                 continue
-            if cmd == "mode" and arg in SYSTEM_FOR:
+            if cmd == "examples":
+                ex = examples_for(agent.mode, agent.lang)
+                if ex:
+                    for e in ex:
+                        console.print(f"  [cyan]•[/] {e}")
+                else:
+                    console.print("[dim]（暂无示例）[/]")
+                continue
+            if cmd == "mode" and arg in MODES:
                 agent.reset(arg)
                 console.print(f"[green]✓ 已切换到 {arg} 模式（历史已清空）[/]")
                 continue
             if cmd == "model" and arg:
                 agent.model = resolve_model(arg)
                 console.print(f"[green]✓ 模型: {agent.model}[/]")
+                continue
+            if cmd == "lang" and arg:
+                code = arg.strip().lower()[:2]
+                if code in LANG_LABELS:
+                    agent.set_lang(code)
+                    console.print(f"[green]✓ 输出语言: {LANG_LABELS[code]}（{code}）"
+                                  f"——下次回复起生效。[/]")
+                else:
+                    console.print(f"[red]不支持。可选: {'/'.join(SUPPORTED_LANGS)}[/]")
+                continue
+            if cmd == "usage":
+                console.print(agent.usage_summary())
+                continue
+            if cmd == "status":
+                do_status(agent)
                 continue
             if cmd == "pdf":
                 if not arg:
@@ -227,11 +332,17 @@ def repl(agent) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="科研实用 Agent — 能源/动力工程")
-    ap.add_argument("mode", nargs="?", choices=list(SYSTEM_FOR),
-                    help="直接进入的模式")
+    ap.add_argument("mode", nargs="?", choices=list(MODES),
+                    help="直接进入的模式：literature / writing / review")
     ap.add_argument("--model", default=None,
                     help="模型：sonnet / opus / haiku 或完整 id；默认 sonnet")
     args = ap.parse_args()
+
+    # 没配置 API key → 跑首次运行向导
+    if not os.getenv("ANTHROPIC_API_KEY"):
+        console.print("[yellow]✗ 未检测到 ANTHROPIC_API_KEY[/]")
+        if not run_setup_wizard():
+            return 1
 
     try:
         from agent import ResearchAgent
@@ -241,7 +352,10 @@ def main() -> int:
         )
     except RuntimeError as e:
         console.print(f"[red]✗ {e}[/]")
-        console.print("[dim]把 .env.example 复制为 .env 并填入 ANTHROPIC_API_KEY[/]")
+        console.print("[dim]配置好 .env（ANTHROPIC_API_KEY）后重试。[/]")
+        return 1
+    except ValueError as e:
+        console.print(f"[red]✗ {e}[/]")
         return 1
 
     try:

@@ -2,9 +2,10 @@
 
 用法:
     from agent import ResearchAgent
-    ag = ResearchAgent(mode="literature", model="claude-sonnet-5")
+    ag = ResearchAgent(mode="literature")             # 语言自动检测 / 读 OUTPUT_LANG
     ag.add_user("检索近 5 年 sCO2 布雷顿循环高被引论文")
     ag.run_turn()  # 流式打印，自动执行工具，直到模型结束本轮
+    ag.set_lang("en")                                  # 实时切输出语言
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ import os
 import anthropic
 from rich.console import Console
 
-from prompts import SYSTEM_FOR
+from prompts import system_for, MODELS, OUTPUT_LANG
 from tools import TOOLS, dispatch
 
 console = Console()
@@ -22,13 +23,17 @@ MAX_TOOL_ITER = 8  # 单轮最多工具调用轮次，防死循环
 
 
 class ResearchAgent:
-    def __init__(self, mode: str = "literature", model: str | None = None):
-        if mode not in SYSTEM_FOR:
-            raise ValueError(f"未知模式: {mode}（可选: {list(SYSTEM_FOR)}）")
+    def __init__(self, mode: str = "literature", model: str | None = None,
+                 lang: str | None = None):
         self.mode = mode
+        self.lang = lang or OUTPUT_LANG
         self.model = model or os.getenv("MODEL") or "claude-sonnet-5"
-        self.system = SYSTEM_FOR[mode]
+        self.system = system_for(mode, self.lang)
         self.messages: list[dict] = []
+        # token 用量（累计）
+        self.total_input = 0
+        self.total_output = 0
+        self.turns = 0
         key = os.getenv("ANTHROPIC_API_KEY")
         if not key:
             raise RuntimeError(
@@ -38,14 +43,20 @@ class ResearchAgent:
 
     def reset(self, mode: str | None = None) -> None:
         if mode:
-            if mode not in SYSTEM_FOR:
-                raise ValueError(f"未知模式: {mode}")
             self.mode = mode
-            self.system = SYSTEM_FOR[mode]
+            self.system = system_for(mode, self.lang)
         self.messages = []
+
+    def set_lang(self, lang: str) -> None:
+        self.lang = lang
+        self.system = system_for(self.mode, lang)
 
     def add_user(self, text: str) -> None:
         self.messages.append({"role": "user", "content": text})
+
+    def usage_summary(self) -> str:
+        return (f"本会话累计：输入 {self.total_input:,} / 输出 {self.total_output:,} "
+                f"tokens（共 {self.turns} 轮）")
 
     def run_turn(self) -> str:
         """执行一轮：流式打印文本，遇到 tool_use 自动执行并续跑。返回最终文本。"""
@@ -63,6 +74,12 @@ class ResearchAgent:
                     console.print(text, end="")
                     final_text += text
                 final = stream.get_final_message()
+
+            # 累计 token 用量（每次 stream 都会产生一次 input 计费）
+            usage = getattr(final, "usage", None)
+            if usage is not None:
+                self.total_input += getattr(usage, "input_tokens", 0) or 0
+                self.total_output += getattr(usage, "output_tokens", 0) or 0
 
             if final.stop_reason == "tool_use":
                 self.messages.append({"role": "assistant", "content": final.content})
@@ -87,4 +104,9 @@ class ResearchAgent:
         else:
             console.print("\n[yellow]⚠ 达到单轮工具调用上限，已停止。[/]")
 
+        self.turns += 1
+        if usage is not None:
+            console.print(f"\n[dim]本轮: 输入 {getattr(usage,'input_tokens',0):,} / "
+                          f"输出 {getattr(usage,'output_tokens',0):,} tokens | "
+                          f"{self.usage_summary()}[/]")
         return final_text

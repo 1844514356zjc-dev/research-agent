@@ -12,7 +12,7 @@ A command-line research assistant for **energy & power engineering** researchers
 
 Powered by the Claude API. Literature search runs entirely on **free academic APIs** (OpenAlex / Crossref / Semantic Scholar / arXiv / Unpaywall) — no extra API keys needed. Your notes, drafts, and reviews stay in a local `workspace/` folder; nothing is uploaded.
 
-> 🌐 **Language note:** The agent **defaults to Chinese output** (with English technical terms). It will reply in English (or any language) if you simply ask — e.g. *"answer in English"*. To change the default permanently, edit the prompt in [`prompts.py`](prompts.py).
+> 🌐 **Language note:** The agent **defaults to Chinese output** (with English technical terms) — or whatever your system language detects to. Switch any of these ways: set `OUTPUT_LANG` (`zh`/`en`/`ja`/`es`/`de`), pick it in the first-run wizard, or run `/lang en` mid-session.
 >
 > 📝 Translations of this README may lag behind the authoritative [中文原版 (README.md)](README.md).
 
@@ -85,11 +85,14 @@ Create a `.env` in **the directory you'll run from** (or export env vars any way
 cp .env.example .env   # or create it
 # Edit .env:
 #   ANTHROPIC_API_KEY=sk-ant-...        (required, https://console.anthropic.com)
+#   OUTPUT_LANG=en                       (optional: zh/en/ja/es/de; auto-detected if unset)
 #   UNPAYWALL_EMAIL=you@your-school.edu  (optional, real email — helps find OA PDFs)
 #   MODEL=claude-sonnet-5                (optional, override default model)
 ```
 
 > `.env` is in `.gitignore` — it won't be committed.
+>
+> 💡 **Don't want to configure manually?** Just run `research-agent` — if no API key is found it launches a **first-run wizard** that walks you through key / output language / model, writes `.env` for you, and drops you into the REPL in ~30 seconds.
 
 ---
 
@@ -150,11 +153,15 @@ Inside the REPL, commands start with `/`:
 
 | Command | Effect | Example |
 |---|---|---|
+| `/examples` | Show example prompts for the current mode | |
 | `/pdf <path...>` | Preload one or more PDFs (glob supported) | `/pdf ~/Downloads/*.pdf` |
 | `/rewrite <path> [--to en\|zh] [--style "..."]` | Batch-rewrite a md/txt file, section by section; saves with `-en`/`-zh` suffix | `/rewrite drafts/methods.md --to en --style "Applied Energy"` |
 | `/notes [keywords]` | List notes; with keywords, full-text search | `/notes orc fluid` |
 | `/mode <mode>` | Switch mode (clears history) | `/mode writing` |
 | `/model <name>` | Switch model: `sonnet`/`opus`/`haiku` or full id | `/model opus` |
+| `/lang <zh\|en\|ja\|es\|de>` | Switch output language (takes effect on next reply) | `/lang en` |
+| `/usage` | Show this session's token usage | |
+| `/status` | Show current state (mode/lang/model/workspace/msgs/usage) | |
 | `/save <name>` | Save the conversation to `workspace/notes/` | `/save orc-survey` |
 | `/clear` | Clear current history | |
 | `/help` `/quit` | Help / quit | |
@@ -192,9 +199,12 @@ All config via environment variables (`.env` or shell):
 |---|---|---|
 | `ANTHROPIC_API_KEY` | ✅ | Your Claude API key |
 | `MODEL` | — | Default `claude-sonnet-5`; review benefits from `claude-opus-4-8` |
+| `OUTPUT_LANG` | — | Output language: `zh`/`en`/`ja`/`es`/`de`. Auto-detected from system locale if unset (default `zh`). Switch live with `/lang` |
 | `UNPAYWALL_EMAIL` | — | Contact email for OA lookups — use a **real** address (`example.com` is rejected) |
 
 **Model tips:** `sonnet` for everyday search/read/write (fast, cheap, good enough); switch to `opus` for deep reviews where reasoning matters (slower, pricier).
+
+**Output language:** auto-detected from your system locale by default. Change it via the `OUTPUT_LANG` env var, the first-run wizard, or `/lang en` mid-session (takes effect on the next reply).
 
 ---
 
@@ -292,6 +302,10 @@ research-agent/
 **Where are notes stored?** In `workspace/` under **the directory you run from**, as plain markdown. Run elsewhere → different workspace.
 
 **Other disciplines?** Domain knowledge lives in `DOMAIN_KNOWLEDGE` in [`prompts.py`](prompts.py) — edit that block to repurpose it (chemistry, materials, mechanical…). The search/writing tools are discipline-agnostic.
+
+**Can I change the output language?** Yes — three ways: set `OUTPUT_LANG` (`zh`/`en`/`ja`/`es`/`de`), pick it in the first-run wizard, or run `/lang en` mid-session (takes effect on the next reply). Unset → auto-detected from your system locale.
+
+**The PDF text comes out empty?** It's probably a scanned PDF (image only, no text layer). The tool detects this and warns; run it through OCR first (`ocrmypdf`, Tesseract, Adobe Acrobat OCR) to add a text layer.
 
 **How long is chat history kept?** In-memory for the current session only. `/save` archives it; the next launch is a fresh session — but `workspace/` notes persist.
 
