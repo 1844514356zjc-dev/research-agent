@@ -219,14 +219,40 @@ All config via environment variables (`.env` or shell):
 
 | Variable | Required | Description |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | ✅ | Your Claude API key |
-| `MODEL` | — | Default `claude-sonnet-5`; review benefits from `claude-opus-4-8` |
+| `ANTHROPIC_API_KEY` | ✅ | Your API key (Anthropic's own key for direct use; the proxy's master key when using a proxy) |
+| `ANTHROPIC_BASE_URL` | — | Use a proxy: the proxy's base URL (e.g. `http://localhost:4000` for LiteLLM). Unset = direct to Anthropic |
+| `MODEL` | — | Default `claude-sonnet-5`; review benefits from `claude-opus-4-8`; when using a proxy, the model name the proxy knows |
 | `OUTPUT_LANG` | — | Output language: `zh`/`en`/`ja`/`es`/`de`. Auto-detected from system locale if unset (default `zh`). Switch live with `/lang` |
 | `UNPAYWALL_EMAIL` | — | Contact email for OA lookups — use a **real** address (`example.com` is rejected) |
 
 **Model tips:** `sonnet` for everyday search/read/write (fast, cheap, good enough); switch to `opus` for deep reviews where reasoning matters (slower, pricier).
 
 **Output language:** auto-detected from your system locale by default. Change it via the `OUTPUT_LANG` env var, the first-run wizard, or `/lang en` mid-session (takes effect on the next reply).
+
+### Use a proxy (DeepSeek / Qwen / local models)
+
+Don't want Anthropic? Run a LiteLLM proxy — it exposes the Anthropic `/v1/messages` protocol and translates to any backend. No code changes.
+
+1. Install LiteLLM: `pip install 'litellm[proxy]'`
+2. Write `litellm-config.yaml` (example running DeepSeek):
+   ```yaml
+   model_list:
+     - model_name: deepseek-chat
+       litellm_params:
+         model: deepseek/deepseek-chat
+         api_key: sk-your-deepseek-key
+   # master_key: sk-proxy-anything   # optional: lock the proxy itself
+   ```
+3. Start it: `litellm --config litellm-config.yaml --port 4000`
+4. Set your `.env`:
+   ```bash
+   ANTHROPIC_API_KEY=sk-proxy-anything      # the master_key above (anything if unset)
+   ANTHROPIC_BASE_URL=http://localhost:4000
+   MODEL=deepseek-chat                       # matches model_name in the config
+   ```
+5. Run `research-agent` as usual. `/status` will show "backend: proxy http://localhost:4000".
+
+> Tool-calling is translated by the proxy; DeepSeek / Qwen / OpenAI-family all work reliably. Smaller or local models may be weaker at multi-turn tool use. To switch backend, just change `model:` in the config — zero code changes.
 
 ---
 

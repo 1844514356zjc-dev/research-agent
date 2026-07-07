@@ -39,7 +39,13 @@ class ResearchAgent:
             raise RuntimeError(
                 "未设置 ANTHROPIC_API_KEY。请在 .env 或环境变量中配置。"
             )
-        self.client = anthropic.Anthropic(api_key=key)
+        # 走代理（LiteLLM / 兼容服务）：设 ANTHROPIC_BASE_URL 指向代理的根地址，
+        # SDK 会请求 {base_url}/v1/messages，由代理翻译成 DeepSeek/Qwen/OpenAI 等后端。
+        self.base_url = os.getenv("ANTHROPIC_BASE_URL") or ""
+        client_kwargs = {"api_key": key}
+        if self.base_url:
+            client_kwargs["base_url"] = self.base_url
+        self.client = anthropic.Anthropic(**client_kwargs)
 
     def reset(self, mode: str | None = None) -> None:
         if mode:

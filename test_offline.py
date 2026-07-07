@@ -140,6 +140,49 @@ def test_lang_detection_returns_supported():
             os.environ.pop("OUTPUT_LANG", None)
 
 
+def test_agent_base_url_passthrough():
+    """走代理：ResearchAgent 应把 ANTHROPIC_BASE_URL 透传给客户端（构造离线，不联网）。"""
+    import os
+    saved = {k: os.environ.get(k) for k in
+             ("ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "MODEL")}
+    try:
+        os.environ["ANTHROPIC_API_KEY"] = "dummy-key"
+        os.environ["ANTHROPIC_BASE_URL"] = "http://localhost:4000"
+        os.environ["MODEL"] = "deepseek-chat"
+        import agent as _agent
+        ag = _agent.ResearchAgent(mode="literature")
+        assert ag.base_url == "http://localhost:4000", "base_url 应被记录"
+        assert ag.model == "deepseek-chat", "MODEL 应透传"
+        # SDK 客户端应指向代理（不联网，仅检查配置）
+        client_url = str(getattr(ag.client, "base_url", "") or "")
+        assert "localhost:4000" in client_url, f"客户端 base_url 应含代理地址: {client_url}"
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
+def test_agent_direct_when_no_base_url():
+    """不设 ANTHROPIC_BASE_URL 时 base_url 为空（直连 Anthropic）。"""
+    import os
+    saved = {k: os.environ.get(k) for k in
+             ("ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL")}
+    try:
+        os.environ["ANTHROPIC_API_KEY"] = "dummy-key"
+        os.environ.pop("ANTHROPIC_BASE_URL", None)
+        import agent as _agent
+        ag = _agent.ResearchAgent(mode="review")
+        assert ag.base_url == ""
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
 def _run_all():
     tests = [(k, v) for k, v in sorted(globals().items())
              if k.startswith("test_") and callable(v)]

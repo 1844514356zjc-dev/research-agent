@@ -62,6 +62,7 @@ def banner(agent) -> None:
     table.add_row("模式", agent.mode)
     table.add_row("输出语言", f"{agent.lang}（{LANG_LABELS.get(agent.lang, '?')}）")
     table.add_row("模型", agent.model)
+    table.add_row("后端", f"代理 {agent.base_url}" if agent.base_url else "直连 Anthropic")
     table.add_row("工作区", str(WORKSPACE))
     console.print(Panel(table, title="[bold]科研 Agent[/]  ·  能源/动力工程",
                         border_style="cyan", expand=False))
@@ -124,19 +125,28 @@ def run_setup_wizard() -> bool:
         if lang not in LANG_LABELS:
             lang = detected
 
-        console.print("3) 默认模型：sonnet（推荐，日常够用）/ opus（深度审稿）/ haiku（最快最省）")
+        console.print("3) 默认模型：sonnet（推荐，日常够用）/ opus（深度审稿）/ haiku（最快最省）"
+                       "  ·走代理则填代理里的模型名")
         model_in = Prompt.ask("   默认模型", default="sonnet").strip().lower()
         model_id = resolve_model(model_in) if model_in else "claude-sonnet-5"
+
+        console.print("4) 走代理？填代理根地址（如 http://localhost:4000 用 LiteLLM）；"
+                       "回车跳过=直连 Anthropic")
+        base_url = Prompt.ask("   ANTHROPIC_BASE_URL", default="").strip()
     except (EOFError, KeyboardInterrupt):
         console.print("\n[yellow]向导已取消。[/]")
         return False
 
-    _write_env({
+    env_values = {
         "ANTHROPIC_API_KEY": key,
         "OUTPUT_LANG": lang,
         "MODEL": model_id,
-    })
-    console.print(f"[green]✓ 已写入 .env（输出语言: {LANG_LABELS[lang]}，模型: {model_id}）[/]")
+    }
+    if base_url:
+        env_values["ANTHROPIC_BASE_URL"] = base_url
+    _write_env(env_values)
+    backend = f"，代理: {base_url}" if base_url else "，直连 Anthropic"
+    console.print(f"[green]✓ 已写入 .env（输出语言: {LANG_LABELS[lang]}，模型: {model_id}{backend}）[/]")
     load_dotenv(override=True)
     return True
 
@@ -216,6 +226,7 @@ def do_status(agent) -> None:
     t.add_row("模式", agent.mode)
     t.add_row("输出语言", f"{agent.lang}（{LANG_LABELS.get(agent.lang, '?')}）")
     t.add_row("模型", agent.model)
+    t.add_row("后端", f"代理 {agent.base_url}" if agent.base_url else "直连 Anthropic")
     t.add_row("工作区", str(WORKSPACE))
     t.add_row("消息数", str(len(agent.messages)))
     t.add_row("用量", agent.usage_summary())
