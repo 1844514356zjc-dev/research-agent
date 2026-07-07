@@ -1,5 +1,7 @@
 # 科研实用 Agent · Energy & Power Engineering
 
+**简体中文** | [English](README.en.md) | [日本語](README.ja.md) | [Español](README.es.md) | [Deutsch](README.de.md)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![CI](https://github.com/1844514356zjc-dev/research-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/1844514356zjc-dev/research-agent/actions/workflows/ci.yml)
