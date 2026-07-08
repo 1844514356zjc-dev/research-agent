@@ -34,15 +34,21 @@ class ResearchAgent:
         self.total_input = 0
         self.total_output = 0
         self.turns = 0
-        key = os.getenv("ANTHROPIC_API_KEY")
-        if not key:
+        # 认证：优先 ANTHROPIC_AUTH_TOKEN（Bearer，智谱等代理常用），
+        # 其次 ANTHROPIC_API_KEY（x-api-key，Anthropic 官方）。
+        auth_token = os.getenv("ANTHROPIC_AUTH_TOKEN")
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if auth_token:
+            client_kwargs = {"auth_token": auth_token}
+        elif api_key:
+            client_kwargs = {"api_key": api_key}
+        else:
             raise RuntimeError(
-                "未设置 ANTHROPIC_API_KEY。请在 .env 或环境变量中配置。"
+                "未设置 ANTHROPIC_API_KEY 或 ANTHROPIC_AUTH_TOKEN。请在 .env 或环境变量中配置。"
             )
         # 走代理（LiteLLM / 兼容服务）：设 ANTHROPIC_BASE_URL 指向代理的根地址，
         # SDK 会请求 {base_url}/v1/messages，由代理翻译成 DeepSeek/Qwen/OpenAI 等后端。
         self.base_url = os.getenv("ANTHROPIC_BASE_URL") or ""
-        client_kwargs = {"api_key": key}
         if self.base_url:
             client_kwargs["base_url"] = self.base_url
         self.client = anthropic.Anthropic(**client_kwargs)

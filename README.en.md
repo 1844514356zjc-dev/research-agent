@@ -256,6 +256,8 @@ Don't want Anthropic? Run a LiteLLM proxy — it exposes the Anthropic `/v1/mess
 5. Run `research-agent` as usual. `/status` will show "backend: proxy http://localhost:4000".
 
 > Tool-calling is translated by the proxy; DeepSeek / Qwen / OpenAI-family all work reliably. Smaller or local models may be weaker at multi-turn tool use. To switch backend, just change `model:` in the config — zero code changes.
+>
+> 💡 **Bearer auth** (e.g. Zhipu GLM's Anthropic-compatible endpoint `open.bigmodel.cn/api/anthropic`): use `ANTHROPIC_AUTH_TOKEN` instead of `ANTHROPIC_API_KEY`. Both are supported; if both are set, AUTH_TOKEN wins.
 
 ---
 
