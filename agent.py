@@ -34,6 +34,8 @@ class ResearchAgent:
         self.total_input = 0
         self.total_output = 0
         self.turns = 0
+        self.last_input_tokens = 0           # 最近一次 stream 的 input（≈当前上下文大小）
+        self.max_context = int(os.getenv("MAX_CONTEXT_TOKENS", "120000"))
         # 认证：优先 ANTHROPIC_AUTH_TOKEN（Bearer，智谱等代理常用），
         # 其次 ANTHROPIC_API_KEY（x-api-key，Anthropic 官方）。
         auth_token = os.getenv("ANTHROPIC_AUTH_TOKEN")
@@ -118,7 +120,14 @@ class ResearchAgent:
 
         self.turns += 1
         if usage is not None:
-            console.print(f"\n[dim]本轮: 输入 {getattr(usage,'input_tokens',0):,} / "
+            self.last_input_tokens = getattr(usage, "input_tokens", 0) or 0
+            console.print(f"\n[dim]本轮: 输入 {self.last_input_tokens:,} / "
                           f"输出 {getattr(usage,'output_tokens',0):,} tokens | "
                           f"{self.usage_summary()}[/]")
+            if self.last_input_tokens > 0.8 * self.max_context:
+                pct = self.last_input_tokens * 100 // self.max_context
+                console.print(
+                    f"[yellow]⚠ 上下文已达 {self.last_input_tokens:,} tokens（约 {pct}% "
+                    f"of {self.max_context:,}）。建议 /compact 压缩，或 /save 后 /clear，"
+                    f"否则下轮可能超限报错。[/]")
         return final_text

@@ -189,6 +189,7 @@ Inside the REPL, commands start with `/`:
 | `/status` | Show current state (mode/lang/model/workspace/msgs/usage) | |
 | `/save <name>` | Save the conversation to `workspace/notes/` | `/save orc-survey` |
 | `/clear` | Clear current history | |
+| `/compact` | Compress the chat into a recap and reset context (keeps key points, saves tokens; warns at 80% context) | `/compact` |
 | `/help` `/quit` | Help / quit | |
 
 ---
@@ -227,6 +228,7 @@ All config via environment variables (`.env` or shell):
 | `MODEL` | — | Default `claude-sonnet-5`; review benefits from `claude-opus-4-8`; when using a proxy, the model name the proxy knows |
 | `OUTPUT_LANG` | — | Output language: `zh`/`en`/`ja`/`es`/`de`. Auto-detected from system locale if unset (default `zh`). Switch live with `/lang` |
 | `UNPAYWALL_EMAIL` | — | Contact email for OA lookups — use a **real** address (`example.com` is rejected) |
+| `MAX_CONTEXT_TOKENS` | — | Context-limit warning threshold, default `120000`; suggests `/compact` at 80% (set to the model's window, e.g. `128000` for GLM-4.6, `200000` for Claude) |
 
 **Model tips:** `sonnet` for everyday search/read/write (fast, cheap, good enough); switch to `opus` for deep reviews where reasoning matters (slower, pricier).
 

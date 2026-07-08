@@ -9,6 +9,7 @@
 import os
 import re
 import json
+import time
 import urllib.parse
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -107,6 +108,28 @@ def _dedupe(records: list[dict]) -> list[dict]:
 # 检索源
 # ---------------------------------------------------------------------------
 
+def _retry_get(url, params=None, headers=None, timeout=20, attempts=3, base_delay=0.6):
+    """带指数退避的 GET：对 429 / 5xx / 超时 / 连接错误重试 attempts 次，
+    仍失败则抛 requests.RequestException（让上层按既有方式计为"源失败"）。
+    2xx 与非 429 的 4xx 原样返回，由调用方 raise_for_status 或自行判断。"""
+    delay = base_delay
+    last_err = "unknown"
+    for i in range(attempts):
+        try:
+            r = requests.get(url, params=params, headers=headers or HEADERS, timeout=timeout)
+            if r.status_code == 429 or r.status_code >= 500:
+                last_err = f"HTTP {r.status_code}"
+            else:
+                return r
+        except (requests.Timeout, requests.ConnectionError) as e:
+            last_err = type(e).__name__
+        if i == attempts - 1:
+            break
+        time.sleep(delay)
+        delay *= 2.5
+    raise requests.RequestException(f"{last_err} after {attempts} retries: {url}")
+
+
 def _search_openalex(query: str, n: int) -> list[dict]:
     url = "https://api.openalex.org/works"
     params = {
@@ -115,7 +138,7 @@ def _search_openalex(query: str, n: int) -> list[dict]:
         "mailto": EMAIL,        # 进 polite pool，限额更高
         "tool": "research-agent",
     }
-    r = requests.get(url, params=params, headers=HEADERS, timeout=20)
+    r = _retry_get(url, params=params, timeout=20)
     r.raise_for_status()
     out = []
     for w in r.json().get("results", [])[:n]:
@@ -141,7 +164,7 @@ def _search_openalex(query: str, n: int) -> list[dict]:
 def _search_crossref(query: str, n: int) -> list[dict]:
     url = "https://api.crossref.org/works"
     params = {"query": query, "rows": min(max(n, 1), 25)}
-    r = requests.get(url, params=params, headers=HEADERS, timeout=20)
+    r = _retry_get(url, params=params, timeout=20)
     r.raise_for_status()
     out = []
     for it in r.json()["message"].get("items", [])[:n]:
@@ -173,7 +196,7 @@ def _crossref_by_doi(doi: str) -> dict | None:
     """经 DOI 从 Crossref 取单篇完整元数据（失败返回 None）。"""
     url = f"https://api.crossref.org/works/{urllib.parse.quote(doi)}"
     try:
-        r = requests.get(url, headers=HEADERS, timeout=20)
+        r = _retry_get(url, timeout=20)
         if r.status_code != 200:
             return None
         return r.json().get("message")
@@ -272,7 +295,7 @@ def _search_semanticscholar(query: str, n: int) -> list[dict]:
         "limit": min(max(n, 1), 25),
         "fields": "title,year,authors,citationCount,abstract,openAccessPdf,externalIds,venue",
     }
-    r = requests.get(url, params=params, headers=HEADERS, timeout=25)
+    r = _retry_get(url, params=params, timeout=25)
     r.raise_for_status()
     out = []
     for p in r.json().get("data", [])[:n]:
@@ -300,7 +323,7 @@ def _search_arxiv(query: str, n: int) -> list[dict]:
         "max_results": min(max(n, 1), 25),
         "sortBy": "relevance",
     }
-    r = requests.get(url, params=params, headers=HEADERS, timeout=25)
+    r = _retry_get(url, params=params, timeout=25)
     r.raise_for_status()
     ns = {"a": "http://www.w3.org/2005/Atom"}
     root = ET.fromstring(r.text)
@@ -413,7 +436,7 @@ def get_citations(doi_or_id: str, direction: str = "citing") -> str:
     url = f"https://api.semanticscholar.org/graph/v1/paper/{pid}/{field}"
     params = {"fields": "title,year,authors,citationCount,externalIds", "limit": 20}
     try:
-        r = requests.get(url, params=params, headers=HEADERS, timeout=25)
+        r = _retry_get(url, params=params, timeout=25)
         r.raise_for_status()
     except requests.RequestException as e:
         msg = str(e)[:80]
@@ -446,7 +469,7 @@ def get_open_pdf(doi: str) -> str:
     doi = doi.strip()
     url = f"https://api.unpaywall.org/v2/{urllib.parse.quote(doi)}"
     try:
-        r = requests.get(url, params={"email": EMAIL}, headers=HEADERS, timeout=20)
+        r = _retry_get(url, params={"email": EMAIL}, timeout=20)
         r.raise_for_status()
     except requests.RequestException as e:
         msg = str(e)[:80]

@@ -219,6 +219,82 @@ def test_export_bibtex_rejects_empty():
     assert "需要非空" in tools.export_bibtex("not-a-list")  # 非列表
 
 
+def test_retry_get_succeeds_after_transient():
+    """429 两次后第 3 次成功 → 应重试到拿到 200。"""
+    import tools
+    orig_get, orig_sleep = tools.requests.get, tools.time.sleep
+    calls = []
+
+    class _R:
+        def __init__(self, s):
+            self.status_code = s
+
+    def fake_get(url, params=None, headers=None, timeout=20):
+        calls.append(1)
+        return _R(429 if len(calls) <= 2 else 200)
+
+    tools.requests.get = fake_get
+    tools.time.sleep = lambda *_: None
+    try:
+        r = tools._retry_get("http://x", attempts=3)
+        assert r is not None and r.status_code == 200
+        assert len(calls) == 3, f"应重试3次，实际 {len(calls)}"
+    finally:
+        tools.requests.get, tools.time.sleep = orig_get, orig_sleep
+
+
+def test_retry_get_raises_after_exhausting():
+    """持续 429 → 耗尽后抛 RequestException。"""
+    import tools, requests
+    orig_get, orig_sleep = tools.requests.get, tools.time.sleep
+
+    class _R:
+        status_code = 429
+
+    n = {"i": 0}
+
+    def fake_get(*a, **k):
+        n["i"] += 1
+        return _R()
+
+    tools.requests.get = fake_get
+    tools.time.sleep = lambda *_: None
+    try:
+        raised = False
+        try:
+            tools._retry_get("http://x", attempts=3)
+        except requests.RequestException:
+            raised = True
+        assert raised, "耗尽应抛 RequestException"
+        assert n["i"] == 3, f"应重试3次，实际 {n['i']}"
+    finally:
+        tools.requests.get, tools.time.sleep = orig_get, orig_sleep
+
+
+def test_retry_get_no_retry_on_4xx():
+    """非 429 的 4xx（如 404）应立即返回、不重试。"""
+    import tools
+    orig_get, orig_sleep = tools.requests.get, tools.time.sleep
+
+    class _R:
+        status_code = 404
+
+    n = {"i": 0}
+
+    def fake_get(*a, **k):
+        n["i"] += 1
+        return _R()
+
+    tools.requests.get = fake_get
+    tools.time.sleep = lambda *_: None
+    try:
+        r = tools._retry_get("http://x", attempts=3)
+        assert r is not None and r.status_code == 404
+        assert n["i"] == 1, "4xx 不该重试"
+    finally:
+        tools.requests.get, tools.time.sleep = orig_get, orig_sleep
+
+
 def _run_all():
     tests = [(k, v) for k, v in sorted(globals().items())
              if k.startswith("test_") and callable(v)]

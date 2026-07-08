@@ -46,6 +46,7 @@ HELP = """\
   /status              查看当前状态（模式/语言/模型/工作区/消息数/用量）
   /save <名>           把当前对话保存到 workspace/notes/对话记录-<名>.md
   /clear               清空当前模式的历史
+  /compact             把对话压成纪要、清零上下文（保留要点、省 token）
   /help, /?            显示本帮助
   /quit, /exit         退出
 """
@@ -272,6 +273,28 @@ def do_related(agent, arg: str) -> None:
         console.print(f"\n[red]✗ 起草出错: {e}[/]")
 
 
+def do_compact(agent) -> None:
+    """让模型把当前对话压成纪要，再用纪要替换历史（保留连续性、清零上下文）。"""
+    if not agent.messages:
+        console.print("[yellow]历史为空，无需压缩。[/]")
+        return
+    console.print("[cyan]正在把对话压成纪要…[/]")
+    agent.add_user(
+        "请把以上对话压缩成一份简明纪要，只保留：关键结论与决定、已检索/精读的论文（含 DOI）、"
+        "已写入的文件路径、待办与未决问题。不要调用任何工具，只输出纪要本身。"
+    )
+    try:
+        recap = agent.run_turn()
+    except Exception as e:
+        console.print(f"\n[red]✗ 压缩出错: {e}[/]")
+        return
+    agent.messages = [{
+        "role": "user",
+        "content": f"（前文已压缩为纪要，后续基于此继续）\n\n{recap}",
+    }]
+    console.print(f"[green]✓ 历史已压成纪要（{len(recap)} 字符），上下文清零。继续提问即可。[/]")
+
+
 def do_status(agent) -> None:
     t = Table(show_header=False, box=None, padding=(0, 2))
     t.add_column(style="cyan", no_wrap=True)
@@ -391,6 +414,9 @@ def repl(agent) -> None:
             if cmd == "clear":
                 agent.reset()
                 console.print("[green]✓ 历史已清空[/]")
+                continue
+            if cmd == "compact":
+                do_compact(agent)
                 continue
             console.print("[red]命令无效或参数缺失。/help 查看用法。[/]")
             continue
