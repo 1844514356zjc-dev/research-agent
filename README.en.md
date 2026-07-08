@@ -182,6 +182,8 @@ Inside the REPL, commands start with `/`:
 | `/matrix [name]` | Literature comparison matrix: N papers → markdown table (author·year / method / conditions / findings / limits) | `/matrix orc-fluids` |
 | `/related [topic]` | Draft a Related-Work section from your notes (with citations) | `/related ORC working fluids` |
 | `/bib [name]` | Export DOIs of papers discussed into a BibTeX (`.bib`) file | `/bib orc-survey` |
+| `/params [name]` | Extract a reproducibility params card (fluid/conditions/state-points/equations) → markdown | `/params liu2004` |
+| `/checkcites` | Review: verify DOIs cited in the manuscript are real and on-topic | `/checkcites` |
 | `/mode <mode>` | Switch mode (clears history) | `/mode writing` |
 | `/model <name>` | Switch model: `sonnet`/`opus`/`haiku` or full id | `/model opus` |
 | `/lang <zh\|en\|ja\|es\|de>` | Switch output language (takes effect on next reply) | `/lang en` |
@@ -190,6 +192,8 @@ Inside the REPL, commands start with `/`:
 | `/save <name>` | Save the conversation to `workspace/notes/` | `/save orc-survey` |
 | `/clear` | Clear current history | |
 | `/compact` | Compress the chat into a recap and reset context (keeps key points, saves tokens; warns at 80% context) | `/compact` |
+| `/load <name>` | Resume a `/save`d conversation as context | `/load orc-survey` |
+| `/export <path> [--to docx\|tex]` | Export markdown to Word/LaTeX → `workspace/drafts/` | `/export drafts/related.md --to docx` |
 | `/help` `/quit` | Help / quit | |
 
 ---

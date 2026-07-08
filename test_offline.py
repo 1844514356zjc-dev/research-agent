@@ -295,6 +295,41 @@ def test_retry_get_no_retry_on_4xx():
         tools.requests.get, tools.time.sleep = orig_get, orig_sleep
 
 
+def test_table_to_markdown():
+    import tools
+    md = tools._table_to_markdown([["流体", "效率"], ["R245fa", "8.5%"], ["R123", "7.2%"]])
+    assert "| 流体 | 效率 |" in md
+    assert "| --- | --- |" in md
+    assert "| R245fa | 8.5% |" in md
+
+
+def test_md_to_tex_basics():
+    import tools
+    tex = tools._md_to_tex("# Title\n\n## Sec\n\n- **a** item\n- b\n\nplain $x=1$")
+    assert r"\section{Title}" in tex
+    assert r"\subsection{Sec}" in tex
+    assert r"\begin{itemize}" in tex and r"\end{itemize}" in tex
+    assert r"\textbf{a}" in tex
+    assert "$x=1$" in tex          # 数学原样保留
+
+
+def test_verify_citations_rejects_empty():
+    import tools
+    assert "需要非空" in tools.verify_citations([])
+    assert "需要非空" in tools.verify_citations("nope")
+
+
+def test_md_to_docx_if_available():
+    import tools
+    try:
+        import docx  # noqa: F401
+    except ImportError:
+        print("  (skip: 本机未装 python-docx)")
+        return
+    b = tools._md_to_docx_bytes("# T\n\n- a\n\n正文段落")
+    assert b[:2] == b"PK"          # docx 是 zip，魔数 "PK"
+
+
 def _run_all():
     tests = [(k, v) for k, v in sorted(globals().items())
              if k.startswith("test_") and callable(v)]

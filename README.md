@@ -179,6 +179,8 @@ research-agent review  --model opus  # 审稿推荐用 opus
 | `/matrix [名]` | 文献对比矩阵：N 篇论文 → markdown 对比表（作者·年 / 方法 / 工况 / 结论 / 局限） | `/matrix orc-fluids` |
 | `/related [主题]` | 基于笔记起草 Related Work 综述段（带引用） | `/related ORC 工质筛选` |
 | `/bib [名]` | 把会话里讨论过的论文 DOI 导出为 BibTeX（`.bib`） | `/bib orc-survey` |
+| `/params [名]` | 抽取可复现参数卡（工质/工况/状态点/公式）→ markdown | `/params liu2004` |
+| `/checkcites` | 审稿：核验稿件里的 DOI 引用是否真实、是否对题 | `/checkcites` |
 | `/mode <模式>` | 切模式（清空历史）：`literature` / `writing` / `review` | `/mode writing` |
 | `/model <名>` | 切模型：`sonnet` / `opus` / `haiku` 或完整 id | `/model opus` |
 | `/lang <zh\|en\|ja\|es\|de>` | 实时切换输出语言 | `/lang en` |
@@ -187,6 +189,8 @@ research-agent review  --model opus  # 审稿推荐用 opus
 | `/save <名>` | 把当前对话存到 `workspace/notes/对话记录-<名>.md` | `/save orc-survey` |
 | `/clear` | 清空当前模式历史 | |
 | `/compact` | 把对话压成纪要、清零上下文（保留要点、省 token；上下文超 80% 会提醒） | `/compact` |
+| `/load <名>` | 载入 `/save` 的对话纪要，恢复上下文 | `/load orc-survey` |
+| `/export <路径> [--to docx\|tex]` | 把 markdown 导出为 Word/LaTeX → `workspace/drafts/` | `/export drafts/related.md --to docx` |
 | `/help` `/quit` | 帮助 / 退出 | |
 
 ---

@@ -660,6 +660,165 @@ def search_notes(query: str, n: int = 5, scope: str = "all") -> str:
 
 
 # ---------------------------------------------------------------------------
+# 审稿查引用 / PDF 表格 / 文档导出
+# ---------------------------------------------------------------------------
+
+def verify_citations(dois: list) -> str:
+    """批量核验 DOI 是否真实存在（Crossref），返回每条状态 + 真实标题/作者/年。
+    用于审稿抓杜撰或张冠李戴的引用。"""
+    if not isinstance(dois, list) or not dois:
+        return "[verify_citations: 需要非空 dois 列表]"
+    lines = ["引用核验（Crossref）："]
+    ok = bad = 0
+    for raw in dois:
+        doi = _normalize_doi(str(raw))
+        if not doi:
+            lines.append(f"  ✗ {raw} —— 无效 DOI 格式"); bad += 1; continue
+        work = _crossref_by_doi(doi)
+        if not work:
+            lines.append(f"  ✗ {doi} —— Crossref 查无此 DOI（可能杜撰或未登记）"); bad += 1
+        else:
+            title = (work.get("title") or ["?"])[0]
+            auth = work.get("author") or []
+            who = (auth[0].get("family", "") if auth else "?") + (" 等" if len(auth) > 1 else "")
+            dp = (work.get("published") or {}).get("date-parts") or [[None]]
+            year = (dp[0][0] if dp and dp[0] else "?")
+            lines.append(f"  ✓ {doi} —— {title} ({who}, {year})"); ok += 1
+    lines.append(f"\n小计：{ok} 条真实 / {bad} 条可疑")
+    return _truncate("\n".join(lines))
+
+
+def _table_to_markdown(tbl: list) -> str:
+    """pdfplumber 表（list of rows）→ markdown 表格。"""
+    if not tbl:
+        return ""
+    rows = [[(c or "").strip().replace("\n", " ") for c in row] for row in tbl]
+    width = max(len(r) for r in rows)
+    rows = [r + [""] * (width - len(r)) for r in rows]
+    out = ["| " + " | ".join(rows[0]) + " |",
+           "| " + " | ".join(["---"] * width) + " |"]
+    for r in rows[1:]:
+        out.append("| " + " | ".join(r) + " |")
+    return "\n".join(out)
+
+
+def read_pdf_tables(path: str, pages: str | None = None) -> str:
+    """提取 PDF 里的表格为 markdown。pages 可选 '1-5' 或 '2,4,6'。"""
+    import pdfplumber  # 延迟导入
+    p = _resolve(path)
+    if not p.exists():
+        return f"[文件不存在: {p}]"
+    page_idx = _parse_pages(pages)
+    out = []
+    total = 0
+    try:
+        with pdfplumber.open(str(p)) as pdf:
+            total = len(pdf.pages)
+            targets = page_idx if page_idx is not None else range(total)
+            for i in targets:
+                if 0 <= i < total:
+                    tbls = pdf.pages[i].extract_tables() or []
+                    for ti, tbl in enumerate(tbls):
+                        if tbl:
+                            out.append(f"--- 第 {i+1} 页 · 表 {ti+1} ---")
+                            out.append(_table_to_markdown(tbl))
+    except Exception as e:
+        return f"[提取表格失败: {e}]"
+    if not out:
+        return f"[{total} 页中未检测到表格（可能是扫描/图像表，需 OCR）]"
+    return _truncate("\n\n".join(out) + f"\n\n[共 {total} 页]")
+
+
+def _md_to_docx_bytes(text: str) -> bytes:
+    """markdown → docx（python-docx），返回字节。支持标题/列表/段落/表格行。"""
+    import io
+    from docx import Document
+    doc = Document()
+    for line in text.splitlines():
+        s = line.rstrip()
+        if not s.strip():
+            continue
+        if s.startswith("### "):
+            doc.add_heading(s[4:], level=3)
+        elif s.startswith("## "):
+            doc.add_heading(s[3:], level=2)
+        elif s.startswith("# "):
+            doc.add_heading(s[2:], level=1)
+        elif s.startswith("- ") or s.startswith("* "):
+            doc.add_paragraph(s[2:], style="List Bullet")
+        elif re.match(r"^\d+\. ", s):
+            doc.add_paragraph(re.sub(r"^\d+\. ", "", s), style="List Number")
+        else:
+            doc.add_paragraph(re.sub(r"\*\*(.+?)\*\*", r"\1", s))
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def _tex_inline(s: str) -> str:
+    return re.sub(r"\*\*(.+?)\*\*", r"\\textbf{\1}", s)
+
+
+def _md_to_tex(text: str) -> str:
+    """markdown → LaTeX（手写转换，保留 $...$ 数学）。"""
+    body = []
+    in_item = False
+
+    def close_item():
+        nonlocal in_item
+        if in_item:
+            body.append(r"\end{itemize}")
+            in_item = False
+
+    for line in text.splitlines():
+        s = line.rstrip()
+        if not s.strip():
+            continue
+        if s.startswith("### "):
+            close_item(); body.append(r"\subsubsection{" + s[4:] + r"}")
+        elif s.startswith("## "):
+            close_item(); body.append(r"\subsection{" + s[3:] + r"}")
+        elif s.startswith("# "):
+            close_item(); body.append(r"\section{" + s[2:] + r"}")
+        elif s.startswith("- ") or s.startswith("* "):
+            if not in_item:
+                body.append(r"\begin{itemize}"); in_item = True
+            body.append(r"  \item " + _tex_inline(s[2:]))
+        else:
+            close_item(); body.append(_tex_inline(s))
+    close_item()
+    return ("\\documentclass{article}\n"
+            "\\usepackage[utf8]{inputenc}\n"
+            "\\usepackage{amsmath}\n"
+            "\\begin{document}\n"
+            + "\n".join(body) + "\n"
+            "\\end{document}\n")
+
+
+def export_doc(path: str, to: str = "docx") -> str:
+    """把 markdown 文件转成 docx 或 tex，存到 workspace/drafts/<stem>.<to>。"""
+    to = (to or "docx").lower()
+    if to not in ("docx", "tex"):
+        return "[export_doc: to 只支持 docx|tex]"
+    src = _resolve(path)
+    if not src.exists():
+        return f"[源文件不存在: {src}]"
+    text = src.read_text(encoding="utf-8", errors="replace")
+    out = WORKSPACE / "drafts" / f"{src.stem}.{to}"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if to == "docx":
+            out.write_bytes(_md_to_docx_bytes(text))
+        else:
+            out.write_text(_md_to_tex(text), encoding="utf-8")
+    except ImportError:
+        return "[docx 导出需要 python-docx：pip install python-docx]"
+    except Exception as e:
+        return f"[导出失败: {e}]"
+    return f"已导出 {to} → {out}"
+
+
+# ---------------------------------------------------------------------------
 # Schema + 分发
 # ---------------------------------------------------------------------------
 
@@ -791,6 +950,41 @@ TOOLS = [
             "required": ["dois"],
         },
     },
+    {
+        "name": "verify_citations",
+        "description": "审稿用：批量核验 DOI 列表是否真实存在（Crossref），返回每条的真实标题/作者/年 + 可疑项。抓杜撰或张冠李戴。",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "dois": {"type": "array", "items": {"type": "string"}, "description": "待核验的 DOI 列表"},
+            },
+            "required": ["dois"],
+        },
+    },
+    {
+        "name": "read_pdf_tables",
+        "description": "提取 PDF 里的表格为 markdown（论文结果表/参数表常用）。pages 可选 '1-5' 或 '2,4,6'。",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "本地 PDF 路径"},
+                "pages": {"type": "string", "description": "页码范围，可选"},
+            },
+            "required": ["path"],
+        },
+    },
+    {
+        "name": "export_doc",
+        "description": "把 workspace 下的 markdown 文件导出为 docx 或 tex（投稿用）。to=docx|tex，存到 workspace/drafts/<stem>.<to>。",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "源 markdown 路径（相对 workspace 或绝对）"},
+                "to": {"type": "string", "enum": ["docx", "tex"], "default": "docx"},
+            },
+            "required": ["path"],
+        },
+    },
 ]
 
 _DISPATCH = {
@@ -804,6 +998,9 @@ _DISPATCH = {
     "search_notes": search_notes,
     "list_notes": list_notes,
     "export_bibtex": export_bibtex,
+    "verify_citations": verify_citations,
+    "read_pdf_tables": read_pdf_tables,
+    "export_doc": export_doc,
 }
 
 

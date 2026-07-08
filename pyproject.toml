@@ -25,6 +25,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "rich>=13.7.0",
     "requests>=2.31.0",
+    "python-docx>=1.1.0",
 ]
 
 # 安装后提供 research-agent 命令。注意：采用扁平模块布局（main/agent/tools/prompts

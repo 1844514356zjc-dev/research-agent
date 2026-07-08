@@ -47,6 +47,10 @@ HELP = """\
   /save <名>           把当前对话保存到 workspace/notes/对话记录-<名>.md
   /clear               清空当前模式的历史
   /compact             把对话压成纪要、清零上下文（保留要点、省 token）
+  /params [名]         抽取可复现参数卡（工质/工况/状态点/公式）→ workspace/notes/
+  /checkcites          审稿：核验稿件里的 DOI 引用是否真实、是否对题
+  /load <名>           载入 /save 的对话纪要，恢复上下文
+  /export <路径> [--to docx|tex]  把 markdown 导出为 Word/LaTeX → workspace/drafts/
   /help, /?            显示本帮助
   /quit, /exit         退出
 """
@@ -295,6 +299,75 @@ def do_compact(agent) -> None:
     console.print(f"[green]✓ 历史已压成纪要（{len(recap)} 字符），上下文清零。继续提问即可。[/]")
 
 
+def do_checkcites(agent) -> None:
+    """审稿：核验已载入稿件里的 DOI 引用是否真实、是否对题。"""
+    if not agent.messages:
+        console.print("[yellow]先 /pdf 载入稿件，再 /checkcites。[/]")
+        return
+    agent.add_user(
+        "从已载入的稿件里找出所有引用的 DOI（References 与正文引用处），"
+        "调用 verify_citations(dois=[...]) 核验真实性。对查无/可疑的，明确指出，"
+        "若能从上下文推断出正确 DOI 则给出建议。最后给一句总体引用可信度判断。"
+    )
+    try:
+        agent.run_turn()
+    except Exception as e:
+        console.print(f"\n[red]✗ 出错: {e}[/]")
+
+
+def do_params(agent, arg: str) -> None:
+    """抽取可复现参数卡（工质/工况/状态点/公式）。"""
+    name = arg.strip() or "params"
+    fname = name if name.endswith(".md") else f"params-{name}.md"
+    agent.add_user(
+        "请基于已载入的 PDF（或 workspace/notes 笔记），抽取一份【可复现参数卡】，含："
+        "系统/循环构型、工质、边界条件（热源/冷源温度、压力、流量）、关键状态点参数表、"
+        "关键假设、核心公式与出处、模型验证情况。数值务必带单位、照搬原文不要杜撰，"
+        f"找不到的字段标'未给出'。用 write_file 存到 workspace/notes/{fname}。"
+        "若稿件未载入，提示用户先 /pdf。"
+    )
+    try:
+        agent.run_turn()
+    except Exception as e:
+        console.print(f"\n[red]✗ 出错: {e}[/]")
+
+
+def do_load(agent, arg: str) -> None:
+    """载入 /save 存下的对话纪要，作为上下文恢复连续性。"""
+    from tools import read_file
+    name = arg.strip()
+    if not name:
+        console.print("[red]用法: /load <名>（对应 /save 时用的名字）[/]")
+        return
+    path = f"notes/对话记录-{name}.md"
+    text = read_file(path)
+    if text.startswith("[") and "不存在" in text:
+        console.print(f"[red]找不到 {path}。/notes 看已存对话记录。[/]")
+        return
+    agent.messages = [{"role": "user", "content": f"（载入的历史纪要，后续基于此继续）\n\n{text}"}]
+    console.print(f"[green]✓ 已载入 对话记录-{name}（{len(text)} 字符），继续提问即可。[/]")
+
+
+def do_export(arg: str) -> None:
+    """把 markdown 文件导出为 docx 或 tex（直接转，不调 LLM）。"""
+    try:
+        toks = shlex.split(arg)
+    except ValueError:
+        toks = arg.split()
+    if not toks:
+        console.print('[red]用法: /export <markdown路径> [--to docx|tex][/]'); return
+    path = toks[0]
+    to = "docx"
+    i = 1
+    while i < len(toks):
+        if toks[i] == "--to" and i + 1 < len(toks):
+            to = toks[i + 1]; i += 2
+        else:
+            i += 1
+    from tools import export_doc
+    console.print(export_doc(path, to))
+
+
 def do_status(agent) -> None:
     t = Table(show_header=False, box=None, padding=(0, 2))
     t.add_column(style="cyan", no_wrap=True)
@@ -417,6 +490,18 @@ def repl(agent) -> None:
                 continue
             if cmd == "compact":
                 do_compact(agent)
+                continue
+            if cmd == "checkcites":
+                do_checkcites(agent)
+                continue
+            if cmd == "params":
+                do_params(agent, arg)
+                continue
+            if cmd == "load" and arg:
+                do_load(agent, arg)
+                continue
+            if cmd == "export" and arg:
+                do_export(arg)
                 continue
             console.print("[red]命令无效或参数缺失。/help 查看用法。[/]")
             continue

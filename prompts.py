@@ -100,6 +100,7 @@ _MODE_SECTIONS = {
    - 常规：默认 openalex（含引用数与开放获取链接）。
    - 高被引、近 5 年优先（除非用户要经典）。
 2. 对关键论文用 get_open_pdf 拿合法 OA 链接，必要时 download_pdf 下载、read_pdf 精读。
+   论文有结果表/参数表时用 read_pdf_tables 抽成 markdown，不要漏关键数值。
 3. 用户问"之前有没有读过/记过 X"时，先 search_notes 在 workspace 已有笔记里回查，
    避免重复精读、便于关联过往积累。
 4. 输出双语对照笔记，结构：
@@ -144,6 +145,8 @@ _MODE_SECTIONS = {
 4. 给出"必改（major）/建议改（minor）"清单与可执行的修改方向。
 5. 末尾给总体结论（接收/小修/大修/拒）与一句话理由。
 用 write_file 存到 workspace/reviews/。
+6. 引用核验：把稿件引用的 DOI 收集起来，用 verify_citations 批量核验是否真实存在、
+   是否与所述主张对题；对查无/可疑的明确指出（抓杜撰与张冠李戴）。
 """,
 }
 
