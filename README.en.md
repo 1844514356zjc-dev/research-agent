@@ -179,6 +179,9 @@ Inside the REPL, commands start with `/`:
 | `/pdf <path...>` | Preload one or more PDFs (glob supported) | `/pdf ~/Downloads/*.pdf` |
 | `/rewrite <path> [--to en\|zh] [--style "..."]` | Batch-rewrite a md/txt file, section by section; saves with `-en`/`-zh` suffix | `/rewrite drafts/methods.md --to en --style "Applied Energy"` |
 | `/notes [keywords]` | List notes; with keywords, full-text search | `/notes orc fluid` |
+| `/matrix [name]` | Literature comparison matrix: N papers → markdown table (author·year / method / conditions / findings / limits) | `/matrix orc-fluids` |
+| `/related [topic]` | Draft a Related-Work section from your notes (with citations) | `/related ORC working fluids` |
+| `/bib [name]` | Export DOIs of papers discussed into a BibTeX (`.bib`) file | `/bib orc-survey` |
 | `/mode <mode>` | Switch mode (clears history) | `/mode writing` |
 | `/model <name>` | Switch model: `sonnet`/`opus`/`haiku` or full id | `/model opus` |
 | `/lang <zh\|en\|ja\|es\|de>` | Switch output language (takes effect on next reply) | `/lang en` |
@@ -285,6 +288,19 @@ research-agent review --model opus
 你: Evaluate against Energy journal standards, focus on novelty and rigor, give a major/minor list.
 你: /save self-review-v1
 ```
+
+### ④ Survey → submission pipeline (matrix → Related Work → BibTeX)
+
+```bash
+research-agent literature
+你: /pdf ~/Downloads/a.pdf ~/Downloads/b.pdf ~/Downloads/c.pdf   # load papers to compare
+你: /matrix orc-fluids                                            # comparison table → workspace/notes/matrix-orc-fluids.md
+你: /mode writing
+你: /related ORC working fluids                                   # draft Related Work → workspace/drafts/related-work.md
+你: /bib orc-survey                                               # export .bib → workspace/notes/orc-survey.bib
+```
+
+End-to-end from "a pile of papers" to "comparison table + synthesis paragraph + a `.bib` you can `\cite` right away."
 
 ---
 

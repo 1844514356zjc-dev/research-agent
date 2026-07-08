@@ -165,6 +165,106 @@ def _search_crossref(query: str, n: int) -> list[dict]:
     return out
 
 
+# ---------------------------------------------------------------------------
+# BibTeX 导出：DOI → Crossref 元数据 → @article 条目
+# ---------------------------------------------------------------------------
+
+def _crossref_by_doi(doi: str) -> dict | None:
+    """经 DOI 从 Crossref 取单篇完整元数据（失败返回 None）。"""
+    url = f"https://api.crossref.org/works/{urllib.parse.quote(doi)}"
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=20)
+        if r.status_code != 200:
+            return None
+        return r.json().get("message")
+    except Exception:
+        return None
+
+
+_BIB_STOP = {"the", "a", "an", "of", "on", "for", "and", "to", "in", "with",
+             "from", "by", "via", "as", "at", "is", "or"}
+
+
+def _bibtex_key(work: dict) -> str:
+    """citation key：firstauthor+year+标题首词（跳过冠词介词），如 liu2004effect。"""
+    authors = work.get("author") or []
+    family = (authors[0].get("family") if authors else "") or "anon"
+    family = "".join(c for c in family.lower() if c.isalnum()) or "anon"
+    dp = (work.get("published") or {}).get("date-parts") or [[None]]
+    year = (dp[0][0] if dp and dp[0] else None) or "nd"
+    title = (work.get("title") or ["paper"])[0]
+    words = [w.lower() for w in re.findall(r"[A-Za-z0-9]+", title)
+             if w.lower() not in _BIB_STOP]
+    word = words[0] if words else "ref"
+    return f"{family}{year}{word}"
+
+
+def _format_bibtex(key: str, work: dict) -> str:
+    """把 Crossref work 渲染成一条 @article BibTeX。"""
+    author_str = " and ".join(
+        f"{a.get('family', '')}, {a.get('given', '')}".strip(", ")
+        for a in (work.get("author") or [])
+    )
+    title = (work.get("title") or [""])[0]
+    container = (work.get("container-title") or [""])[0]
+    dp = (work.get("published") or {}).get("date-parts") or [[None]]
+    year = (dp[0][0] if dp and dp[0] else "") or ""
+    vol = work.get("volume") or ""
+    num = work.get("issue") or ""
+    page = (work.get("page") or "").replace("-", "--")
+    doi = work.get("DOI") or ""
+    lines = [f"@article{{{key},"]
+    if author_str: lines.append(f"  author  = {{{author_str}}},")
+    if title:     lines.append(f"  title   = {{{title}}},")
+    if container: lines.append(f"  journal = {{{container}}},")
+    if year:      lines.append(f"  year    = {{{year}}},")
+    if vol:       lines.append(f"  volume  = {{{vol}}},")
+    if num:       lines.append(f"  number  = {{{num}}},")
+    if page:      lines.append(f"  pages   = {{{page}}},")
+    if doi:       lines.append(f"  doi     = {{{doi}}},")
+    lines.append("}\n")
+    return "\n".join(lines)
+
+
+def export_bibtex(dois: list, filename: str = "references.bib") -> str:
+    """把 DOI 列表导出为 BibTeX（@article，元数据来自 Crossref），存到 workspace/notes/<filename>。"""
+    if not isinstance(dois, list) or not dois:
+        return "[export_bibtex: 需要非空 dois 列表]"
+    fname = filename or "references.bib"
+    if not fname.endswith(".bib"):
+        fname += ".bib"
+    entries: list[str] = []
+    skipped: list[str] = []
+    seen: set[str] = set()
+    ok = 0
+    for raw in dois:
+        doi = _normalize_doi(str(raw))
+        if not doi:
+            skipped.append(str(raw)); continue
+        work = _crossref_by_doi(doi)
+        if not work:
+            entries.append(
+                f"% 未取到 {doi} 的 Crossref 元数据，请手工补全\n"
+                f"@misc{{{re.sub(r'[^A-Za-z0-9]', '', doi)},\n  doi = {{{doi}}}\n}}\n")
+            skipped.append(doi); continue
+        key = _bibtex_key(work)
+        base, i = key, 1
+        while key in seen:
+            i += 1
+            key = f"{base}{chr(96 + i)}"  # a, b, c…
+        seen.add(key)
+        entries.append(_format_bibtex(key, work))
+        ok += 1
+    body = "\n".join(entries)
+    out = write_file(f"notes/{fname}", body)
+    if skipped:
+        msg = (f"已导出 {ok} 条 BibTeX 到 {out}；另 {len(skipped)} 条取不到元数据、"
+               f"已留 @misc 占位（{', '.join(skipped[:3])}{'…' if len(skipped) > 3 else ''}）")
+    else:
+        msg = f"已导出 {ok} 条 BibTeX 到 {out}"
+    return msg
+
+
 def _search_semanticscholar(query: str, n: int) -> list[dict]:
     url = "https://api.semanticscholar.org/graph/v1/paper/search"
     params = {
@@ -656,6 +756,18 @@ TOOLS = [
         "description": "列出 workspace 下 notes/drafts/reviews 里的全部 markdown 文件名与大小。",
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
+    {
+        "name": "export_bibtex",
+        "description": "把 DOI 列表导出为 BibTeX（@article，元数据来自 Crossref），存到 workspace/notes/。用于 LaTeX/Zotero/投稿。",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "dois": {"type": "array", "items": {"type": "string"}, "description": "DOI 列表（裸 DOI 或 DOI URL 均可）"},
+                "filename": {"type": "string", "description": "文件名（默认 references.bib），存到 workspace/notes/<filename>", "default": "references.bib"},
+            },
+            "required": ["dois"],
+        },
+    },
 ]
 
 _DISPATCH = {
@@ -668,6 +780,7 @@ _DISPATCH = {
     "download_pdf": download_pdf,
     "search_notes": search_notes,
     "list_notes": list_notes,
+    "export_bibtex": export_bibtex,
 }
 
 

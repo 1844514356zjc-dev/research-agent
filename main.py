@@ -36,6 +36,9 @@ HELP = """\
   /rewrite <路径>      批量改写一个 md/txt 文件：逐节翻译/润色并存新文件
                        可选 --to en|zh（默认 en）、--style "期刊或风格名"
   /notes [关键词]      列出已有笔记；给关键词则跨笔记检索
+  /matrix [名]         文献对比矩阵：N 篇论文 → markdown 对比表（作者/方法/工况/结论/局限）
+  /related [主题]      基于笔记起草 Related Work 综述段（带引用）
+  /bib [名]            把会话里讨论过的论文 DOI 导出为 BibTeX（.bib）
   /mode <模式>         切换模式：literature / writing / review（清空历史）
   /model <名>          切换模型：sonnet / opus / haiku 或完整模型 id
   /lang <zh|en|ja|es|de>  实时切换输出语言
@@ -219,6 +222,56 @@ def do_notes(arg: str) -> None:
     console.print(search_notes(arg) if arg else list_notes())
 
 
+def do_bib(agent, arg: str) -> None:
+    """收集会话/笔记里讨论过的论文 DOI，导出 BibTeX。"""
+    name = arg.strip() or "references"
+    fname = name if name.endswith(".bib") else f"{name}.bib"
+    agent.add_user(
+        f"请把本次会话讨论过的论文（以及 workspace/notes 里笔记涉及的论文）整理成 DOI 列表，"
+        f"调用 export_bibtex(dois=[...], filename=\"{fname}\") 导出到 workspace/notes/{fname}。"
+        f"如果会话和笔记里都没出现过具体论文，告诉用户先检索或 /pdf 载入后再试。"
+    )
+    try:
+        agent.run_turn()
+    except Exception as e:
+        console.print(f"\n[red]✗ 导出出错: {e}[/]")
+
+
+def do_matrix(agent, arg: str) -> None:
+    """生成文献对比矩阵 markdown 表。"""
+    name = arg.strip() or "matrix"
+    fname = name if name.endswith(".md") else f"matrix-{name}.md"
+    agent.add_user(
+        "请基于当前会话已载入的 PDF / 已检索的论文 / workspace/notes 里的笔记，"
+        "生成一份【文献对比矩阵】markdown 表格，列：作者·年 | 研究问题 | 系统/方法 | "
+        "关键工况与参数 | 主要结论（含数值） | 局限。每篇论文一行，数值与单位保留，不要杜撰。"
+        f"用 write_file 存到 workspace/notes/{fname}。"
+        "若可用论文不足 2 篇，提示用户先 /pdf 载入或检索更多。"
+    )
+    try:
+        agent.run_turn()
+    except Exception as e:
+        console.print(f"\n[red]✗ 生成出错: {e}[/]")
+
+
+def do_related(agent, arg: str) -> None:
+    """基于笔记起草 Related Work 综述。"""
+    topic = arg.strip()
+    focus = f"聚焦主题：{topic}。" if topic else ""
+    agent.add_user(
+        f"请{focus}基于 workspace/notes 里已有的笔记（必要时先 search_notes 检索，"
+        "或 search_papers 补 1-2 篇关键文献），起草一段【Related Work 相关工作综述】。要求：\n"
+        "1) 按思路/方法流派分组、有逻辑递进与对比，不是摘抄堆叠；\n"
+        "2) 每条引用给出 [作者, 年] 或 \\citep{key}，key 与已有/将导出的 .bib 一致；\n"
+        "3) 末尾点出研究空白，引出你自己的工作；\n"
+        "4) 完成后用 write_file 存到 workspace/drafts/related-work.md。"
+    )
+    try:
+        agent.run_turn()
+    except Exception as e:
+        console.print(f"\n[red]✗ 起草出错: {e}[/]")
+
+
 def do_status(agent) -> None:
     t = Table(show_header=False, box=None, padding=(0, 2))
     t.add_column(style="cyan", no_wrap=True)
@@ -322,6 +375,15 @@ def repl(agent) -> None:
                 continue
             if cmd == "notes":
                 do_notes(arg)
+                continue
+            if cmd == "bib":
+                do_bib(agent, arg)
+                continue
+            if cmd == "matrix":
+                do_matrix(agent, arg)
+                continue
+            if cmd == "related":
+                do_related(agent, arg)
                 continue
             if cmd == "save" and arg:
                 save_transcript(agent, arg)

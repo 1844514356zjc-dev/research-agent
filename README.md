@@ -176,6 +176,9 @@ research-agent review  --model opus  # 审稿推荐用 opus
 | `/pdf <路径...>` | 预载一篇或多篇 PDF（支持通配符） | `/pdf ~/Downloads/*.pdf` |
 | `/rewrite <路径> [--to en\|zh] [--style "..."]` | 批量改写 md/txt：逐节翻译/润色，存成带 `-en`/`-zh` 后缀的新文件 | `/rewrite drafts/methods.md --to en --style "Applied Energy"` |
 | `/notes [关键词]` | 列出已有笔记；给关键词则跨笔记检索 | `/notes orc 工质` |
+| `/matrix [名]` | 文献对比矩阵：N 篇论文 → markdown 对比表（作者·年 / 方法 / 工况 / 结论 / 局限） | `/matrix orc-fluids` |
+| `/related [主题]` | 基于笔记起草 Related Work 综述段（带引用） | `/related ORC 工质筛选` |
+| `/bib [名]` | 把会话里讨论过的论文 DOI 导出为 BibTeX（`.bib`） | `/bib orc-survey` |
 | `/mode <模式>` | 切模式（清空历史）：`literature` / `writing` / `review` | `/mode writing` |
 | `/model <名>` | 切模型：`sonnet` / `opus` / `haiku` 或完整 id | `/model opus` |
 | `/lang <zh\|en\|ja\|es\|de>` | 实时切换输出语言 | `/lang en` |
@@ -282,6 +285,19 @@ research-agent review --model opus
 你: 按 Energy 期刊标准评估，重点看创新性和方法严谨性，给 major/minor 清单
 你: /save self-review-v1
 ```
+
+### ④ 综述—投稿主路径（对比矩阵 → Related Work → BibTeX）
+
+```bash
+research-agent literature
+你: /pdf ~/Downloads/a.pdf ~/Downloads/b.pdf ~/Downloads/c.pdf     # 载入要对比的论文
+你: /matrix orc-fluids                                              # 生成对比表 → workspace/notes/matrix-orc-fluids.md
+你: /mode writing
+你: /related ORC 工质筛选                                           # 起草 Related Work 段 → workspace/drafts/related-work.md
+你: /bib orc-survey                                                 # 导出 .bib → workspace/notes/orc-survey.bib
+```
+
+一条龙从"一堆论文"走到"对比表 + 综述段 + 可直接 `\cite` 的 .bib"。
 
 ---
 

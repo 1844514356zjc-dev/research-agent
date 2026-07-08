@@ -183,6 +183,42 @@ def test_agent_direct_when_no_base_url():
                 os.environ[k] = v
 
 
+def test_bibtex_key_and_format():
+    import tools
+    work = {
+        "DOI": "10.1016/j.energy.2004.01.004",
+        "title": ["Effect of working fluids on organic Rankine cycle for waste heat recovery"],
+        "container-title": ["Energy"],
+        "published": {"date-parts": [[2004]]},
+        "volume": "29", "issue": "8", "page": "1207-1217",
+        "author": [{"family": "Liu", "given": "Bo-Tau"},
+                   {"family": "Chien", "given": "Kuo-Hsiang"}],
+    }
+    key = tools._bibtex_key(work)
+    assert key == "liu2004effect", f"key={key}"
+    bib = tools._format_bibtex(key, work)
+    assert "@article{liu2004effect," in bib
+    assert "Liu, Bo-Tau and Chien, Kuo-Hsiang" in bib   # 作者 and 分隔
+    assert "1207--1217" in bib                          # 单横杠 → 双横杠
+    assert "10.1016/j.energy.2004.01.004" in bib
+    assert "{2004}" in bib
+    assert "{Energy}" in bib
+
+
+def test_bibtex_key_missing_fields():
+    import tools
+    # 无作者、无年、标题前几个词全为冠词/介词
+    work = {"title": ["On the Theory of Everything"], "DOI": "10.x/y"}
+    key = tools._bibtex_key(work)
+    assert key == "anonndtheory", f"key={key}"   # anon + nd + 首个实义词 theory
+
+
+def test_export_bibtex_rejects_empty():
+    import tools
+    assert "需要非空" in tools.export_bibtex([])
+    assert "需要非空" in tools.export_bibtex("not-a-list")  # 非列表
+
+
 def _run_all():
     tests = [(k, v) for k, v in sorted(globals().items())
              if k.startswith("test_") and callable(v)]
